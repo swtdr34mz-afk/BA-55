@@ -146,13 +146,30 @@ static void fx_render(ba_engine *e, const float *in, float *l, float *r, int n)
     }
     /* ---- der Reverb ---- */
     if (e->rv && rmix > 0.002f) {
+        /* REVERB: bis zur Mitte ein normaler Hall im Raum des Effekts (bis 35 % nass); ab der Mitte (ex) wird er
+         * experimentell: der Raum wächst, der Nachhall wird fast endlos, die Kammlängen schwimmen (der Hall leiert
+         * und schimmert), er wird heller und dreckiger und drängt den trockenen Bass zurück */
+        float ex = rmix > 0.5f ? (rmix - 0.5f) * 2.0f : 0.0f;
+        float wet = rmix < 0.5f ? rmix * 0.7f : 0.35f + 0.65f * ex, dry = 1.0f - 0.55f * wet - 0.25f * ex;
         float sz = (float)fp->rv_size * 0.01f, size = 0.45f + 0.55f * sz, fb = 0.70f + 0.285f * (float)fp->rv_decay * 0.01f;
-        float damp = 0.62f - 0.57f * (float)fp->rv_tone * 0.01f, pk = 0.0f;
-        int len[12], c, pre = (int)((0.004f + 0.036f * sz) * e->sr);
+        float damp = 0.62f - 0.57f * (float)fp->rv_tone * 0.01f, pk = 0.0f, grit = 1.0f + 3.0f * ex * ex;
+        int len[12], c, pre;
+        size += (1.0f - size) * ex;
+        fb += (0.992f - fb) * ex;
+        damp += (0.12f - damp) * ex;
+        pre = (int)((0.004f + 0.036f * sz) * e->sr + (float)(RV_PRE_MAX - 400) * ex * ex);
         if (pre >= RV_PRE_MAX)
             pre = RV_PRE_MAX - 1;
-        for (c = 0; c < 12; c++)
-            len[c] = (int)((float)e->rv_clen[c] * size);
+        e->rv_ph += (0.13f + 0.5f * ex) * (float)n / e->sr;
+        e->rv_ph -= (float)(int)e->rv_ph;
+        for (c = 0; c < 12; c++) {       /* ab der Mitte schwimmen die Kämme, jeder mit eigener Phase */
+            float q = e->rv_ph + (float)c * 0.137f, w;
+            q -= (float)(int)q;
+            w = q < 0.5f ? 2.0f * q : 2.0f - 2.0f * q;   /* ein Dreieck 0..1 */
+            len[c] = (int)((float)e->rv_clen[c] * size * (1.0f - 0.035f * ex * w));
+            if (len[c] < 8)
+                len[c] = 8;
+        }
         for (i = 0; i < n; i++) {
             float x = (l[i] + r[i]) * 0.5f, d, sl = 0.0f, sr2 = 0.0f;
             int a;
@@ -194,8 +211,12 @@ static void fx_render(ba_engine *e, const float *in, float *l, float *r, int n)
             sr2 *= 1.6f;
             if (ba_abs(sl) > pk)
                 pk = ba_abs(sl);
-            l[i] = l[i] * (1.0f - 0.55f * rmix) + sl * rmix;
-            r[i] = r[i] * (1.0f - 0.55f * rmix) + sr2 * rmix;
+            if (ex > 0.0f) {             /* ab der Mitte: angezerrt, damit der endlose Hall nicht explodiert */
+                sl = ba_soft(sl * grit) / grit * (1.0f + ex);
+                sr2 = ba_soft(sr2 * grit) / grit * (1.0f + ex);
+            }
+            l[i] = l[i] * dry + sl * wet;
+            r[i] = r[i] * dry + sr2 * wet;
         }
         e->rv_lvl = pk > e->rv_lvl ? pk : e->rv_lvl * 0.95f;
     } else {

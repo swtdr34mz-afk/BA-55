@@ -665,6 +665,7 @@ static int32_t knob_step(int k, int32_t e)
     }
 }
 
+static int coarse(int k, int32_t e);
 static void knob_turn(int k, int32_t e)
 {
     kdef d = kdef_of(k);
@@ -682,6 +683,8 @@ static void knob_turn(int k, int32_t e)
             v = ba_list_value(d.id, ba_list_index(d.id, v) + dir);
         else if (pi->kind == MK_SW)
             v = dir > 0 ? 127 : 0;
+        else if (d.id == P_RVMIX)        /* REVERB: grob wie SELECT, 2,5 pro Raste, damit man live schnell hinkommt */
+            v = iclamp(v + coarse(EN_K1 + k, e), 0, 127);
         else
             v = iclamp(v + knob_step(k, e), 0, 127);
         if (v != edit.p[d.id]) {
@@ -2430,6 +2433,14 @@ int app_expect(const char *what, int *got)
         ui.batt_tpct = (int8_t)atoi(what + 4);
         ui.batt_pct = -1;
         *got = 0;
+        return 1;
+    }
+    if (!strcmp(what, "reverb")) {      /* reverb: 1 wenn der Hall seinen Speicher hat; reverb_lvl: wie laut er klingt (x1000) */
+        *got = eng.rv != 0;
+        return 1;
+    }
+    if (!strncmp(what, "reverb_ge", 9)) {   /* reverb_geN: der Hall klingt mit mindestens N/1000 (1) */
+        *got = (int)(ba_reverb_level(&eng) * 1000.0f) >= atoi(what + 9);
         return 1;
     }
     if (!strcmp(what, "playing"))
