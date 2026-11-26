@@ -5,20 +5,22 @@
  *
  * Bedienung: die Bedienelemente der Erica Synths Bassline DB-01, auf die Knöpfe des FM-1 verteilt
  *   K1..K4     die vier Regler der Seite
- *   HOME       VCO: WAVE, SUB, NOISE, DETUNE
+ *   HOME       VCO: WAVE, SUB, NOISE, DETUNE; nochmal: GROOVE (STYLE, KICK, DRUMS, PUMP);
+ *              nochmal: GROOVE SETUP (RELEASE, HATS, TUNE, VAR)
  *   SEL        VCF: CUTOFF, RESO, MODE (LP / BP), DRIVE
  *   ENV        ENV: DECAY, DEPTH (die Filterhüllkurve), RELEASE (VCA; ganz rechts offen), GLIDE
  *   LFO        LFO: RATE, FM LVL, LFO LVL, SHAPE; nochmal: SYNC, RESET
  *   SEQ        STEP: STEP, NOTE, GATE, ACC/SLIDE; nochmal: STEP, MOD, PROB; nochmal: STEP, PITCH ENV DEPTH, DECAY
  *   GLO        PATTERN: LAST STEP, PLAY MODE, SHUFFLE, TEMPO; nochmal: SETTINGS (TUNE, MIDI CH, BEND)
  *   EDIT       RND PATT: TARGET, AMOUNT, LOW, HIGH; nochmal: SCALE, ROOT
- *   FX         ARP: DIR, OCT, GATE, LATCH
+ *   FX         (frei: der DB-01 hat keine Effekte)
  *   SELECT     CUTOFF; REC gehalten und SELECT gedreht, während das Pattern läuft: die Mod-Spur des Steps
  *   ALGORITHM  DRIVE                  PRESET   die 16 Plätze
  *   PLAY       Start / Stop           REC   STEP-Seiten: Noten einspielen; RND PATT: ein neues Pattern;
+ *                                           GROOVE-Seiten: der Groove an / aus;
  *                                           sonst 1 s halten: das Werks-Preset
  *   SAVE       speichern: PRESET wählt den Platz, SAVE nochmal speichert
- *   ARP        der Arpeggiator an / aus; auf den STEP-Seiten: Step kopieren / einfügen
+ *   ARP        der Arpeggiator an / aus, dazu seine Seite (DIR, OCT, GATE, LATCH); auf den STEP-Seiten: Step kopieren / einfügen
  *   OCT- OCT+  die Oktave der Tasten; auf den STEP-Seiten: die Oktave des Steps
  *   Tasten     spielen; läuft das Pattern, transponieren sie es (C3 = unverändert) */
 #include "fastmath.h"
@@ -30,12 +32,13 @@ static ba_engine eng;
 static ba_patch edit;                    /* der Klang in Arbeit (den die Engine spielt) */
 
 /* ------------------------------------------------------------ Speicher --- */
-#define SET_MAGIC 0x32354142u            /* "BA52" */
+#define SET_MAGIC 0x33354142u            /* "BA53" (mit GROOVE) */
 #define BANK_MAGIC 0x43354142u           /* "BA5C" */
 #define NSLOTS 16
 typedef struct {
     uint32_t magic;
     uint8_t slot, edited, oct, bend, mch, tune, rsv[2];   /* tune: 0..20 = 430..450 Hz */
+    ba_groove grv;                       /* GROOVE: global, damit ein Presetwechsel den Beat nicht ändert */
     ba_patch edit;
 } settings_t;
 typedef struct {
@@ -96,12 +99,15 @@ static void settings_load(void)
 {
     if (plat_store_load(OBJ_SETTINGS, &set, sizeof set) != (int)sizeof set || set.magic != SET_MAGIC
         || set.slot >= NSLOTS || !patch_ok(&set.edit) || set.oct > 6u || set.bend < 1u || set.bend > 12u
-        || set.mch > 16u || set.tune > 20u) {
+        || set.mch > 16u || set.tune > 20u || set.grv.style >= BA_NSTYLES || set.grv.kick > 127u
+        || set.grv.drums > 127u || set.grv.pump > 127u || set.grv.rel > 127u || set.grv.hats > 127u
+        || set.grv.tune > 127u || set.grv.var > 127u) {
         memset(&set, 0, sizeof set);
         set.magic = SET_MAGIC;
         set.oct = 3;
         set.bend = 2;
         set.tune = 10;                   /* 440 Hz */
+        ba_groove_init(&set.grv);
         set.edit = *slot_patch(0);
     }
     edit = set.edit;
@@ -146,12 +152,14 @@ static void e_arp(int on)
 
 /* ------------------------------------------------------------------ Seiten --- */
 enum { PG_VCO, PG_VCF, PG_ENV, PG_LFO, PG_LFO2, PG_STEP, PG_STEP2, PG_STEP3, PG_PATT, PG_SETUP, PG_RND, PG_SCALE,
-       PG_ARP, NPAGES };
+       PG_ARP, PG_GRV, PG_GSET, NPAGES };
 static const char *const PAGE_NAME[NPAGES] = {"VCO", "VCF", "ENV", "LFO", "LFO", "STEP", "STEP MOD", "STEP PITCH ENV",
-                                              "PATTERN", "SETTINGS", "RND PATT", "SCALE", "ARPEGGIATOR"};
+                                              "PATTERN", "SETTINGS", "RND PATT", "SCALE", "ARPEGGIATOR", "GROOVE",
+                                              "GROOVE SETUP"};
 
 enum { K_NONE, K_PARAM, K_SSEL, K_SNOTE, K_SGATE, K_SFL, K_SMOD, K_SPROB, K_SPED, K_SPEK, K_TEMPO, K_TUNE, K_MCH,
-       K_BEND };
+       K_BEND, K_GRV };
+enum { GV_STYLE, GV_KICK, GV_DRUMS, GV_PUMP, GV_REL, GV_HATS, GV_TUNE, GV_VAR };
 typedef struct { uint8_t kind, id; } kdef;
 
 static const kdef PAGE_K[NPAGES][4] = {
@@ -168,7 +176,16 @@ static const kdef PAGE_K[NPAGES][4] = {
     {{K_PARAM, P_RTGT}, {K_PARAM, P_RAMT}, {K_PARAM, P_RLO}, {K_PARAM, P_RHI}},
     {{K_PARAM, P_SCALE}, {K_PARAM, P_ROOT}, {K_NONE, 0}, {K_NONE, 0}},
     {{K_PARAM, P_ADIR}, {K_PARAM, P_AOCT}, {K_PARAM, P_AGATE}, {K_PARAM, P_ALATCH}},
+    {{K_GRV, GV_STYLE}, {K_GRV, GV_KICK}, {K_GRV, GV_DRUMS}, {K_GRV, GV_PUMP}},
+    {{K_GRV, GV_REL}, {K_GRV, GV_HATS}, {K_GRV, GV_TUNE}, {K_GRV, GV_VAR}},
 };
+
+static uint8_t *grv_field(int f)
+{
+    uint8_t *g[8] = {&set.grv.style, &set.grv.kick, &set.grv.drums, &set.grv.pump, &set.grv.rel, &set.grv.hats,
+                     &set.grv.tune, &set.grv.var};
+    return g[f & 7];
+}
 
 enum { R_HEAD = 1, R_MID = 2, R_LOW = 4, R_ALL = 7 };
 
@@ -198,6 +215,7 @@ static struct {
     uint8_t hot;
     float lfo_scope[96];
     uint8_t lfo_pos;
+    uint32_t kick_seen, flash_until;     /* GROOVE: der Kick-Blitz (ARP-LED) */
 } ui;
 
 static float fabsf_(float x) { return x < 0.0f ? -x : x; }
@@ -359,6 +377,10 @@ static const char *knob_label(kdef d)
     case K_TUNE: return "TUNE";
     case K_MCH: return "MIDI CH";
     case K_BEND: return "BEND";
+    case K_GRV: {
+        static const char *const N[8] = {"STYLE", "KICK", "DRUMS", "PUMP", "RELEASE", "HATS", "TUNE", "VAR"};
+        return N[d.id & 7];
+    }
     default: return "";
     }
 }
@@ -380,11 +402,12 @@ static int knob_get(kdef d)
     case K_TUNE: return set.tune * 127 / 20;
     case K_MCH: return set.mch * 127 / 16;
     case K_BEND: return (set.bend - 1) * 127 / 11;
+    case K_GRV: return d.id == GV_STYLE ? set.grv.style * 127 / (BA_NSTYLES - 1) : *grv_field(d.id);
     default: return -1;
     }
 }
 
-static int knob_bip(kdef d) { return d.kind == K_SMOD; }
+static int knob_bip(kdef d) { return d.kind == K_SMOD || (d.kind == K_GRV && d.id == GV_TUNE); }
 
 static void val_text(kdef d, char *t)
 {
@@ -486,6 +509,20 @@ static void val_text(kdef d, char *t)
             int_text(set.mch, t);
         return;
     case K_BEND: int_text(set.bend, t); text_cat(t, " ST"); return;
+    case K_GRV:
+        switch (d.id) {
+        case GV_STYLE: text_cat(t, BA_STYLE_NAME[set.grv.style]); return;
+        case GV_REL: int_text(40 + set.grv.rel * 560 / 127, t); text_cat(t, "MS"); return;
+        case GV_TUNE: {
+            int st = (set.grv.tune - 64) * 12 / 64;
+            if (st > 0)
+                text_cat(t, "+");
+            int_text(st, t + txt_len(t));
+            text_cat(t, " ST");
+            return;
+        }
+        default: int_text(v * 100 / 127, t); return;
+        }
     default: return;
     }
 }
@@ -639,6 +676,13 @@ static void knob_turn(int k, int32_t e)
         eng.bend_range = (float)set.bend;
         dirty();
         break;
+    case K_GRV:
+        if (d.id == GV_STYLE)
+            set.grv.style = (uint8_t)iclamp(set.grv.style + dir, 0, BA_NSTYLES - 1);
+        else
+            *grv_field(d.id) = (uint8_t)iclamp(*grv_field(d.id) + accel(EN_K1 + k, e, 3, 6), 0, 127);
+        dirty();
+        return;
     default: return;
     }
     seg_value(d);
@@ -768,14 +812,13 @@ static void button(uint32_t i)
         return;
     }
     switch (i) {
-    case B_HOME: page_set(PG_VCO); break;
+    case B_HOME: page_set(ui.page == PG_VCO ? PG_GRV : ui.page == PG_GRV ? PG_GSET : PG_VCO); break;   /* VCO, GROOVE, GROOVE SETUP */
     case B_SEL: page_set(PG_VCF); break;
     case B_ENV: page_set(PG_ENV); break;
     case B_LFO: page_set(ui.page == PG_LFO ? PG_LFO2 : PG_LFO); break;
     case B_SEQ: page_set(ui.page == PG_STEP ? PG_STEP2 : ui.page == PG_STEP2 ? PG_STEP3 : PG_STEP); break;
     case B_GLO: page_set(ui.page == PG_PATT ? PG_SETUP : PG_PATT); break;
     case B_EDIT: page_set(ui.page == PG_RND ? PG_SCALE : PG_RND); break;
-    case B_FX: page_set(PG_ARP); break;
     case B_PLAY: play_toggle(); break;
     case B_REC:
         ui.rec_t = plat_ms();            /* was REC tut, entscheidet das Loslassen (oder 1 s Halten) */
@@ -804,9 +847,10 @@ static void button(uint32_t i)
                 edited();
                 app_say("PASTE", "");
             }
-        } else {
+        } else {                         /* der Arpeggiator an / aus, dazu seine Seite */
             ui.arp = (uint8_t)!ui.arp;
             e_arp(ui.arp);
+            page_set(PG_ARP);
             app_say("ARP", ui.arp ? "ON" : "OFF");
         }
         break;
@@ -841,6 +885,11 @@ static void rec_release(void)            /* REC losgelassen (vor 1 s, ohne SELEC
         app_say(ui.rec ? "RECORD" : "RECORD OFF", ui.rec ? "PLAY KEYS" : "");
     } else if (ui.page == PG_RND) {
         random_pattern();
+    } else if (ui.page == PG_GRV || ui.page == PG_GSET) {   /* auf den GROOVE-Seiten: der Groove an / aus */
+        set.grv.on = (uint8_t)!set.grv.on;
+        dirty();
+        ui.redraw |= R_ALL;
+        app_say("GROOVE", set.grv.on ? BA_STYLE_NAME[set.grv.style] : "OFF");
     }
 }
 
@@ -852,7 +901,8 @@ static void held_buttons(uint32_t btn)
         if (!ui.rec_used && plat_ms() - ui.rec_t < 1000u)
             rec_release();
         ui.rec_t = 0;
-    } else if (!ui.rec_used && plat_ms() - ui.rec_t >= 1000u && !is_step_page(ui.page) && ui.page != PG_RND) {
+    } else if (!ui.rec_used && plat_ms() - ui.rec_t >= 1000u && !is_step_page(ui.page) && ui.page != PG_RND
+               && ui.page != PG_GRV && ui.page != PG_GSET) {
         ui.rec_t = 0;
         factory();
     }
@@ -919,7 +969,7 @@ void app_input_only(void) { input(); }
 static void lights(void)
 {
     static const uint8_t PAGE_BTN[NPAGES] = {B_HOME, B_SEL, B_ENV, B_LFO, B_LFO, B_SEQ, B_SEQ, B_SEQ, B_GLO, B_GLO,
-                                             B_EDIT, B_EDIT, B_FX};
+                                             B_EDIT, B_EDIT, B_ARP, B_HOME, B_HOME};
     uint32_t btn = 1u << PAGE_BTN[ui.page], dimb, lit = 0, k;
     if (ui.playing)
         btn |= LED_PLAY_GREEN;
@@ -927,6 +977,8 @@ static void lights(void)
         btn |= 1u << B_REC;
     if (ui.arp)
         btn |= 1u << B_ARP;
+    if (set.grv.on && ui.playing && plat_ms() < ui.flash_until)   /* GROOVE: HOME blitzt mit jeder Kick */
+        btn ^= 1u << B_HOME;
     if (ui.saving && (plat_ms() / 250u) & 1u)
         btn |= 1u << B_SAVE;
     if (set.oct != 3)
@@ -1328,8 +1380,8 @@ static void draw_knob(int k, int32_t cx, int32_t y, uint32_t now)
 /* ---- die Seitengruppen: kleine LEDs ---- */
 static void group_of(int pg, int *i, int *n)
 {
-    static const uint8_t G0[NPAGES] = {0, 0, 0, 0, 1, 0, 1, 2, 0, 1, 0, 1, 0};
-    static const uint8_t GN[NPAGES] = {1, 1, 1, 2, 2, 3, 3, 3, 2, 2, 2, 2, 1};
+    static const uint8_t G0[NPAGES] = {0, 0, 0, 0, 1, 0, 1, 2, 0, 1, 0, 1, 0, 1, 2};
+    static const uint8_t GN[NPAGES] = {3, 1, 1, 2, 2, 3, 3, 3, 2, 2, 2, 2, 1, 3, 3};
     *i = G0[pg];
     *n = GN[pg];
 }
@@ -1620,6 +1672,45 @@ static void show_arp(void)               /* ARP: die Richtung als Treppe über d
     }
 }
 
+static void show_groove(void)            /* GROOVE: die fünf Spuren über zwei Takte, der laufende Step hell; unten die Pumpe */
+{
+    int lane, i, cur = ba_groove_step(&eng), x;
+    float pump = (float)set.grv.pump / 127.0f, depth = 0.95f * pump * (1.3f - 0.3f * pump);
+    float rel = 0.04f + 0.56f * (float)set.grv.rel / 127.0f, beat = 60.0f / ba_bpm(&eng);
+    for (lane = 0; lane < 5; lane++)
+        for (i = 0; i < 32; i++) {
+            int v = ba_groove_hit(&eng, lane, i), xx = 5 + i * 2 + (i / 16) * 2;
+            int b = v ? (v == 1 ? 90 : v == 2 ? 170 : 230) : (i % 4 ? 0 : 18);
+            if (!set.grv.on && v)
+                b = b * 2 / 3;
+            if (i == cur && v)
+                b = 255;
+            mx_dot(xx, lane * 2, b);
+        }
+    if (cur >= 0)                        /* der Abspielkopf */
+        for (lane = 0; lane < 10; lane++)
+            mx_dot(5 + cur * 2 + (cur / 16) * 2 + 1, lane, 60);
+    for (x = 0; x < MX_W; x++) {         /* die Pumpe: eine Viertel lang */
+        float t = (float)x / (float)(MX_W - 1) * beat, g;
+        int y;
+        if (t < 0.004f)
+            g = 1.0f - depth * t / 0.004f;
+        else if (t < 0.004f + rel) {
+            float u = 1.0f - (t - 0.004f) / rel;
+            g = 1.0f - depth * u * u * (3.0f - 2.0f * u);
+        } else
+            g = 1.0f;
+        y = 18 - (int)(g * 6.5f + 0.5f);
+        mx_dot(x, y, set.grv.on ? 230 : 120);
+        mx_fill_below(x, y + 1, set.grv.on ? 40 : 20);
+    }
+    if (set.grv.on && ui.playing) {      /* wo die Pumpe gerade steht: ein heller Punkt links */
+        int y = 18 - (int)(eng.sc_now * 6.5f + 0.5f);
+        mx_dot(0, y, 255);
+        mx_dot(1, y, 255);
+    }
+}
+
 static void show_glo(void)               /* SETTINGS: das Tempo im Takt, die Last als Balken */
 {
     uint32_t cpu = plat_cpu_pct();
@@ -1639,7 +1730,7 @@ static void show_glo(void)               /* SETTINGS: das Tempo im Takt, die Las
 static int view_animated(void)
 {
     return ui.page == PG_VCO || ui.page == PG_VCF || ui.page == PG_ENV || ui.page == PG_LFO || ui.page == PG_LFO2
-           || ui.page == PG_SETUP || (ui.page == PG_ARP && ui.arp);
+           || ui.page == PG_SETUP || (ui.page == PG_ARP && ui.arp) || ui.page == PG_GRV || ui.page == PG_GSET;
 }
 
 static const char *view_title(char *t)
@@ -1678,6 +1769,10 @@ static const char *view_title(char *t)
         return t;
     }
     case PG_ARP: return ui.arp ? "ARP ON" : "ARP OFF";
+    case PG_GRV:
+    case PG_GSET:
+        text_cat(t, set.grv.on ? BA_STYLE_NAME[set.grv.style] : "GROOVE OFF");
+        return t;
     default: text_cat(t, eng.ext ? "MIDI CLOCK" : "TEMPO"); return t;
     }
 }
@@ -1768,6 +1863,8 @@ static void draw_low(void)
         case PG_RND: show_rnd(); break;
         case PG_SCALE: show_scale(); break;
         case PG_ARP: show_arp(); break;
+        case PG_GRV:
+        case PG_GSET: show_groove(); break;
         default: show_glo(); break;
         }
         mx_draw(15);
@@ -1956,6 +2053,7 @@ void app_init(void)
     ba_init(&eng, SR, &edit);
     eng.bend_range = (float)set.bend;
     eng.tune_hz = 430.0f + (float)set.tune;
+    ba_groove_use(&eng, &set.grv);
     for (i = 0; i < NKEYS; i++)
         ui.key_note[i] = -1;
     ui.copied = -1;
@@ -2075,6 +2173,10 @@ void app_frame(void)
     ui.lfo_pos = (uint8_t)((ui.lfo_pos + 1u) % 96u);
     if (view_animated() && !(ui.frame & 1u))
         ui.redraw |= R_LOW;
+    if (eng.kick_count != ui.kick_seen) {   /* GROOVE: eine Kick, die ARP-LED blitzt */
+        ui.kick_seen = eng.kick_count;
+        ui.flash_until = now + 70u;
+    }
     s = ba_step_now(&eng);
     if (s != ui.step_drawn) {            /* ein neuer Step: die Tasten und die RUN-LED */
         ui.step_drawn = s;
@@ -2160,6 +2262,12 @@ int app_expect(const char *what, int *got)
         *got = set.oct;
     else if (!strcmp(what, "dirty"))
         *got = set_dirty;
+    else if (!strcmp(what, "groove"))
+        *got = set.grv.on;
+    else if (!strcmp(what, "gstyle"))
+        *got = set.grv.style;
+    else if (!strncmp(what, "kicks_ge", 8))   /* kicks_geN: mindestens N Kicks gespielt (1) */
+        *got = (int)eng.kick_count >= atoi(what + 8);
     else if (!strcmp(what, "tune"))
         *got = set.tune;
     else if (!strncmp(what, "seqfl", 5))

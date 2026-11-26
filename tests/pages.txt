@@ -27,8 +27,15 @@ tap EDIT
 shot p_rnd.png
 tap EDIT
 shot p_scale.png
-tap FX
+tap ARP
 shot p_arp.png
+tap ARP
+tap SEL
+tap HOME
+tap HOME
+shot p_groove.png
+tap HOME
+shot p_gset.png
 tap SAVE
 turn PRESET 2
 wait 30

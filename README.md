@@ -60,6 +60,8 @@ pattern), pitch bend bends it. Velocity is not used, as on the DB-01: accents co
 | Button | Page | K1 | K2 | K3 | K4 |
 | --- | --- | --- | --- | --- | --- |
 | HOME | **VCO** | WAVE | SUB | NOISE | DETUNE |
+| HOME again | **GROOVE** | STYLE | KICK | DRUMS | PUMP |
+| HOME a third time | **GROOVE SETUP** | RELEASE | HATS | TUNE | VAR |
 | SEL | **VCF** | CUTOFF | RESO | MODE | DRIVE |
 | ENV | **ENV** | DECAY | DEPTH | RELEASE | GLIDE |
 | LFO | **LFO** | RATE | FM LVL | LFO LVL | SHAPE |
@@ -71,7 +73,17 @@ pattern), pitch bend bends it. Velocity is not used, as on the DB-01: accents co
 | GLO again | **SETTINGS** | TUNE | MIDI CH | BEND | |
 | EDIT | **RND PATT** | TARGET | AMOUNT | LOW | HIGH |
 | EDIT again | **SCALE** | SCALE | ROOT | | |
-| FX | **ARPEGGIATOR** | DIR | OCT | GATE | LATCH |
+| ARP | **ARPEGGIATOR** (and the arpeggiator on / off) | DIR | OCT | GATE | LATCH |
+
+## GROOVE
+
+The one thing the DB-01 doesn't have, taken over from MONSUN: a beat under the bassline, and the **pumping
+sidechain**. Ten styles, two bars each: HOUSE, TECHHOUSE, TECHNO, TRANCE, ACID, DNB, DUBSTEP, GLITCHPOP, EDM, IDM, with
+their own kick, clap or snare, hi-hats and percussion, all synthesized here, and their own swing. It runs with PLAY
+(and MIDI clock), in the pattern's tempo. Every kick ducks the bassline and lets it swell back; with DRUMS fully down
+only the pump stays. The dot matrix shows the five lanes and the pump's curve, the HOME LED flashes with every kick.
+HOME twice opens GROOVE, **REC** there switches the groove on and off. The groove settings are global: changing
+presets keeps the beat.
 
 ## Controls
 
@@ -81,8 +93,8 @@ pattern), pitch bend bends it. Velocity is not used, as on the DB-01: accents co
 | ALGORITHM | OVERDRIVE |
 | PRESET | The 16 slots (a sound with its pattern) |
 | SAVE | Save: PRESET picks the slot, SAVE again saves |
-| REC | STEP pages: notes in; RND PATT: a new pattern; elsewhere held 1 s: the slot's factory preset |
-| ARP | The arpeggiator on / off; on STEP pages copy / paste a step |
+| REC | STEP pages: notes in; RND PATT: a new pattern; GROOVE pages: the groove on / off; elsewhere held 1 s: the slot's factory preset |
+| ARP | The arpeggiator on / off, with its page; on STEP pages copy / paste a step |
 | OCT- / OCT+ | The keys' octave; on STEP pages the step's octave |
 | PLAY | Start / stop |
 

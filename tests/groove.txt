@@ -1,0 +1,44 @@
+# GROOVE (as in MONSUN): HOME twice opens it, REC there switches it on; it plays with PLAY and the kicks pump
+wait 2600
+tap SEL
+tap HOME
+tap HOME
+wait 30
+expect page 13
+expect groove 0
+tap REC
+wait 60
+expect groove 1
+expect arp 0
+turn K1 2
+wait 30
+expect gstyle 2
+tap PLAY
+wav groove.wav
+wait 3000
+wavstop
+expect playing 1
+expect peak_db_min -20
+expect kicks_ge5 1
+shot groove.png
+tap HOME
+wait 30
+expect page 14
+shot groove_setup.png
+tap REC
+wait 60
+expect groove 0
+tap HOME
+wait 30
+expect page 0
+tap PLAY
+wait 100
+expect playing 0
+# ARP: the arpeggiator on, with its page
+tap ARP
+wait 30
+expect arp 1
+expect page 12
+tap ARP
+wait 30
+expect arp 0
