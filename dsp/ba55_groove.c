@@ -83,10 +83,13 @@ int ba_groove_hit(const ba_engine *e, int lane, int step)
 
 int ba_groove_step(const ba_engine *e) { return e->running && e->gv && e->gv->on ? e->g_step : -1; }
 
-/* ---- ein Step: in die Warteschlange mit seiner Stelle im Block ---- */
+/* ---- ein Step: die Uhr des Grooves läuft immer mit dem Pattern (auch wenn er aus ist), damit er beim
+ *      Einschalten genau im Takt einsteigt; gespielt wird nur, wenn er an ist ---- */
 static void groove_step(ba_engine *e, int off)
 {
     e->g_step = (e->g_step + 1) & 31;
+    if (!(e->gv && e->gv->on))
+        return;
     if (e->gqn < 16) {
         e->gq[e->gqn].off = (int16_t)off;
         e->gq[e->gqn].step = (uint8_t)e->g_step;
