@@ -220,7 +220,7 @@ typedef struct {
     float *rv;
     float *rv_comb[12], *rv_ap[8], *rv_pre, rv_cf[12];
     int rv_clen[12], rv_cpos[12], rv_alen[8], rv_apos[8], rv_pre_len, rv_pre_pos;
-    float rv_lvl;
+    float rv_lvl, rv_ph;
     /* Ausgang */
     float mono[256];
     float level_now, cut_hz;

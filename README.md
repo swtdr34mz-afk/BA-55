@@ -92,7 +92,10 @@ drums come after and stay dry.
 - **AMOUNT** brings the effect in, and with it more resonance and drive (fully down: off).
 - **MOTION** says how fast the effect moves: in Hz for the drifting ones, as a note value (1 bar to 1/32) for the
   ones in tempo, how quickly it falls back for the ones that follow the notes. Fully down: still.
-- **REVERB** is the reverb's level; each effect brings its own room.
+- **REVERB** turns fast (2.5 steps a detent, like SELECT). Up to the middle it is a normal reverb in the effect's
+  own room. From the middle on it turns experimental, with every effect: the room grows, the tail becomes almost
+  endless, the reverb drifts and shimmers, gets brighter and dirtier and pushes the dry bass back. Fully up it
+  hangs on like a frozen pad.
 
 The dot matrix shows the ten bands as faders, with what sounds in each as a bright dot on top (a small spectrum
 analyser), and the reverb as a red fog on the right. The title shows which of the 12 is on. The FX settings belong to
