@@ -5,20 +5,22 @@
  *
  * Bedienung: die Bedienelemente der Erica Synths Bassline DB-01, auf die Knöpfe des FM-1 verteilt
  *   K1..K4     die vier Regler der Seite
- *   HOME       VCO: WAVE, SUB, NOISE, DETUNE
+ *   HOME       VCO: WAVE, SUB, NOISE, DETUNE; nochmal: GROOVE (STYLE, KICK, DRUMS, PUMP);
+ *              nochmal: GROOVE SETUP (RELEASE, HATS, TUNE, VAR)
  *   SEL        VCF: CUTOFF, RESO, MODE (LP / BP), DRIVE
  *   ENV        ENV: DECAY, DEPTH (die Filterhüllkurve), RELEASE (VCA; ganz rechts offen), GLIDE
  *   LFO        LFO: RATE, FM LVL, LFO LVL, SHAPE; nochmal: SYNC, RESET
  *   SEQ        STEP: STEP, NOTE, GATE, ACC/SLIDE; nochmal: STEP, MOD, PROB; nochmal: STEP, PITCH ENV DEPTH, DECAY
  *   GLO        PATTERN: LAST STEP, PLAY MODE, SHUFFLE, TEMPO; nochmal: SETTINGS (TUNE, MIDI CH, BEND)
  *   EDIT       RND PATT: TARGET, AMOUNT, LOW, HIGH; nochmal: SCALE, ROOT
- *   FX         ARP: DIR, OCT, GATE, LATCH
+ *   FX         (frei: der DB-01 hat keine Effekte)
  *   SELECT     CUTOFF; REC gehalten und SELECT gedreht, während das Pattern läuft: die Mod-Spur des Steps
  *   ALGORITHM  DRIVE                  PRESET   die 16 Plätze
  *   PLAY       Start / Stop           REC   STEP-Seiten: Noten einspielen; RND PATT: ein neues Pattern;
+ *                                           GROOVE-Seiten: der Groove an / aus;
  *                                           sonst 1 s halten: das Werks-Preset
  *   SAVE       speichern: PRESET wählt den Platz, SAVE nochmal speichert
- *   ARP        der Arpeggiator an / aus; auf den STEP-Seiten: Step kopieren / einfügen
+ *   ARP        der Arpeggiator an / aus, dazu seine Seite (DIR, OCT, GATE, LATCH); auf den STEP-Seiten: Step kopieren / einfügen
  *   OCT- OCT+  die Oktave der Tasten; auf den STEP-Seiten: die Oktave des Steps
  *   Tasten     spielen; läuft das Pattern, transponieren sie es (C3 = unverändert) */
 #include "fastmath.h"
@@ -810,14 +812,13 @@ static void button(uint32_t i)
         return;
     }
     switch (i) {
-    case B_HOME: page_set(PG_VCO); break;
+    case B_HOME: page_set(ui.page == PG_VCO ? PG_GRV : ui.page == PG_GRV ? PG_GSET : PG_VCO); break;   /* VCO, GROOVE, GROOVE SETUP */
     case B_SEL: page_set(PG_VCF); break;
     case B_ENV: page_set(PG_ENV); break;
     case B_LFO: page_set(ui.page == PG_LFO ? PG_LFO2 : PG_LFO); break;
     case B_SEQ: page_set(ui.page == PG_STEP ? PG_STEP2 : ui.page == PG_STEP2 ? PG_STEP3 : PG_STEP); break;
-    case B_GLO: page_set(ui.page == PG_PATT ? PG_SETUP : ui.page == PG_SETUP ? PG_GSET : PG_PATT); break;
+    case B_GLO: page_set(ui.page == PG_PATT ? PG_SETUP : PG_PATT); break;
     case B_EDIT: page_set(ui.page == PG_RND ? PG_SCALE : PG_RND); break;
-    case B_FX: page_set(ui.page == PG_ARP ? PG_GRV : PG_ARP); break;   /* FX: ARPEGGIATOR, nochmal: GROOVE */
     case B_PLAY: play_toggle(); break;
     case B_REC:
         ui.rec_t = plat_ms();            /* was REC tut, entscheidet das Loslassen (oder 1 s Halten) */
@@ -846,14 +847,10 @@ static void button(uint32_t i)
                 edited();
                 app_say("PASTE", "");
             }
-        } else if (ui.page == PG_GRV || ui.page == PG_GSET) {   /* auf den GROOVE-Seiten: der Groove an / aus */
-            set.grv.on = (uint8_t)!set.grv.on;
-            dirty();
-            ui.redraw |= R_ALL;
-            app_say("GROOVE", set.grv.on ? BA_STYLE_NAME[set.grv.style] : "OFF");
-        } else {
+        } else {                         /* der Arpeggiator an / aus, dazu seine Seite */
             ui.arp = (uint8_t)!ui.arp;
             e_arp(ui.arp);
+            page_set(PG_ARP);
             app_say("ARP", ui.arp ? "ON" : "OFF");
         }
         break;
@@ -888,6 +885,11 @@ static void rec_release(void)            /* REC losgelassen (vor 1 s, ohne SELEC
         app_say(ui.rec ? "RECORD" : "RECORD OFF", ui.rec ? "PLAY KEYS" : "");
     } else if (ui.page == PG_RND) {
         random_pattern();
+    } else if (ui.page == PG_GRV || ui.page == PG_GSET) {   /* auf den GROOVE-Seiten: der Groove an / aus */
+        set.grv.on = (uint8_t)!set.grv.on;
+        dirty();
+        ui.redraw |= R_ALL;
+        app_say("GROOVE", set.grv.on ? BA_STYLE_NAME[set.grv.style] : "OFF");
     }
 }
 
@@ -899,7 +901,8 @@ static void held_buttons(uint32_t btn)
         if (!ui.rec_used && plat_ms() - ui.rec_t < 1000u)
             rec_release();
         ui.rec_t = 0;
-    } else if (!ui.rec_used && plat_ms() - ui.rec_t >= 1000u && !is_step_page(ui.page) && ui.page != PG_RND) {
+    } else if (!ui.rec_used && plat_ms() - ui.rec_t >= 1000u && !is_step_page(ui.page) && ui.page != PG_RND
+               && ui.page != PG_GRV && ui.page != PG_GSET) {
         ui.rec_t = 0;
         factory();
     }
@@ -966,7 +969,7 @@ void app_input_only(void) { input(); }
 static void lights(void)
 {
     static const uint8_t PAGE_BTN[NPAGES] = {B_HOME, B_SEL, B_ENV, B_LFO, B_LFO, B_SEQ, B_SEQ, B_SEQ, B_GLO, B_GLO,
-                                             B_EDIT, B_EDIT, B_FX, B_FX, B_GLO};
+                                             B_EDIT, B_EDIT, B_ARP, B_HOME, B_HOME};
     uint32_t btn = 1u << PAGE_BTN[ui.page], dimb, lit = 0, k;
     if (ui.playing)
         btn |= LED_PLAY_GREEN;
@@ -974,8 +977,8 @@ static void lights(void)
         btn |= 1u << B_REC;
     if (ui.arp)
         btn |= 1u << B_ARP;
-    if (set.grv.on && ui.playing && plat_ms() < ui.flash_until)   /* GROOVE: ARP blitzt mit jeder Kick */
-        btn ^= 1u << B_ARP;
+    if (set.grv.on && ui.playing && plat_ms() < ui.flash_until)   /* GROOVE: HOME blitzt mit jeder Kick */
+        btn ^= 1u << B_HOME;
     if (ui.saving && (plat_ms() / 250u) & 1u)
         btn |= 1u << B_SAVE;
     if (set.oct != 3)
@@ -1378,7 +1381,7 @@ static void draw_knob(int k, int32_t cx, int32_t y, uint32_t now)
 static void group_of(int pg, int *i, int *n)
 {
     static const uint8_t G0[NPAGES] = {0, 0, 0, 0, 1, 0, 1, 2, 0, 1, 0, 1, 0, 1, 2};
-    static const uint8_t GN[NPAGES] = {1, 1, 1, 2, 2, 3, 3, 3, 3, 3, 2, 2, 2, 2, 3};
+    static const uint8_t GN[NPAGES] = {3, 1, 1, 2, 2, 3, 3, 3, 2, 2, 2, 2, 1, 3, 3};
     *i = G0[pg];
     *n = GN[pg];
 }

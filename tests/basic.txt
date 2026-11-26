@@ -140,12 +140,11 @@ turn K1 2
 wait 30
 expect tune 12
 shot setup.png
-# the arpeggiator
-tap FX
-wait 30
-expect page 12
+# the arpeggiator: ARP switches it on and opens its page
 tap ARP
+wait 30
 expect arp 1
+expect page 12
 key 7 down 100
 key 11 down 100
 key 14 down 100
