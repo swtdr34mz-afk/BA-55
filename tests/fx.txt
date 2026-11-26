@@ -1,5 +1,6 @@
 # FX: one page, four knobs. FX picks one of 12 effects, AMOUNT brings it in, MOTION moves it, REVERB rings on
 wait 2600
+expect reverb 1
 tap FX
 wait 30
 expect page 15
@@ -17,6 +18,7 @@ shot fx_acid.png
 turn K1 6
 wait 1200
 shot fx_space.png
+expect reverb_ge5 1
 turn K1 3
 turn K2 30
 wait 1200
