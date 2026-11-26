@@ -1,0 +1,19 @@
+# the battery under the name, on every page and under a message: full, a message, two bars, empty (blinks), USB
+wait 2600
+expect batt5 0
+wait 100
+shot batt_full.png
+tap SEL
+wait 50
+shot batt_msg.png
+wait 1400
+expect batt4 0
+wait 100
+shot batt_two.png
+expect batt2 0
+wait 600
+shot batt_empty.png
+expect batt6 0
+tap SEQ
+wait 1400
+shot batt_usb.png

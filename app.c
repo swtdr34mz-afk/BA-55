@@ -211,6 +211,8 @@ static struct {
     uint8_t rec_used;                    /* REC wurde mit SELECT benutzt (die Mod-Spur) */
     int8_t key_note[NKEYS];
     int32_t step_drawn, note_drawn;
+    int8_t batt_drawn;                   /* der Akku, wie er gezeichnet ist (Blinken: mit Halbsekunde) */
+    uint8_t batt_test;
     uint32_t load_at;
     uint8_t hot;
     float lfo_scope[96];
@@ -1787,6 +1789,37 @@ static const char *view_title(char *t)
     }
 }
 
+/* ---- der Akku: unter dem Namen, immer zu sehen. plat_battery: 0..3 Balken, 4 Strom über USB, -1 nicht gelesen
+ *      (die Browser-Version hat keinen Akku: dann nichts). Wie eine Gerätebeschriftung: ein weißer Rahmen, drei
+ *      rote LED-Zellen; leer blinkt die erste Zelle, an USB leuchten alle drei mit einem kleinen Blitz ---- */
+static int batt_level(void)
+{
+#ifdef PLAT_HOST
+    if (ui.batt_test)
+        return ui.batt_test - 2;         /* (Tests: 1 = nicht gelesen, 2..6 = 0..4) */
+#endif
+    return plat_battery();
+}
+
+static void batt_icon(float x, float y, int lvl, uint32_t now)
+{
+    int i, blink = lvl == 0 && (now / 500u) & 1u;
+    col3 off = rgb3(48, 11, 18);
+    rframe(x + 0.5f, y + 0.5f, x + 16.5f, y + 8.5f, 1.5f, c3(C_LINE), 0.85f);
+    rrect((int32_t)x + 17, (int32_t)y + 3, 2, 3, 0.5f, c3(C_LINE), c3(C_LINE), 0.85f);
+    for (i = 0; i < 3; i++) {
+        int on = lvl >= 4 || i < lvl || (i == 0 && blink);
+        rrect((int32_t)x + 2 + i * 5, (int32_t)y + 2, 4, 5, 0.8f, on ? red3() : off, on ? red3() : off, 1.0f);
+        if (on)
+            bloom(x + 4.0f + (float)i * 5.0f, y + 4.5f, 4.0f, red3(), 0.18f);
+    }
+    if (lvl >= 4) {                      /* Strom über USB: ein kleiner Blitz rechts neben dem Akku */
+        aa_line(x + 24.0f, y + 0.5f, x + 22.0f, y + 4.5f, c3(C_WHITE), 0.95f);
+        aa_line(x + 22.0f, y + 4.5f, x + 25.0f, y + 4.5f, c3(C_WHITE), 0.95f);
+        aa_line(x + 25.0f, y + 4.5f, x + 23.0f, y + 8.5f, c3(C_WHITE), 0.95f);
+    }
+}
+
 /* ---- die 16 Step-Tasten: Gummi, gewölbt, die LED scheint durch und wirft Licht aufs Panel ---- */
 static void step_key(int32_t x, int32_t y, float lit, int dim, int play)
 {
@@ -1930,9 +1963,9 @@ static void draw_head(uint32_t now)
     int32_t x;
     cv_begin(240, 32, C_PANEL);
     panel_black(0, 32, 0);
-    if (now < ui.msg_until) {
-        x = ttext(9, 9, &FONT_B, ui.msg[0], C_WHITE, 1);
-        cv_text(x + 8, 9, &FONT_B, ui.msg[1], C_RED);
+    if (now < ui.msg_until) {            /* eine Meldung: etwas höher, damit der Akku darunter frei bleibt */
+        x = ttext(9, 5, &FONT_B, ui.msg[0], C_WHITE, 1);
+        cv_text(x + 8, 5, &FONT_B, ui.msg[1], C_RED);
     } else {
         x = ttext(9, 6, &FONT_B, "BA-55", C_WHITE, 2);
         ttext(x + 9, 5, &FONT_XS, "BASSLINE", C_WHITE, 1);
@@ -1946,6 +1979,11 @@ static void draw_head(uint32_t now)
             bloom(146.0f, 8.0f, beat ? 8.0f : 5.0f, red3(), beat ? 0.7f : 0.35f);
         int_text((int32_t)(ba_bpm(&eng) + 0.5f), t);
         tctext(146, 15, &FONT_XS, t, eng.ext ? C_RED : C_SUB, 0);
+    }
+    {
+        int lvl = batt_level();
+        if (lvl >= 0)
+            batt_icon(9.0f, 21.0f, lvl, now);
     }
     head_display(t);
     seg_display(159, 4, t);
@@ -2139,6 +2177,7 @@ void app_ui_init(void)
     touch_on(1);
     ui.step_drawn = -2;
     ui.note_drawn = -2;
+    ui.batt_drawn = -9;
     ui.intro = 1;
     ui.intro_at = plat_ms();
     ui.redraw = R_ALL;
@@ -2199,6 +2238,13 @@ void app_frame(void)
             ui.redraw |= R_HEAD;
         }
     }
+    {   /* der Akku: neu zeichnen, wenn er sich ändert; leer blinkt er im Halbsekundentakt */
+        int lvl = batt_level(), key = lvl == 0 ? 10 + (int)((now / 500u) & 1u) : lvl;
+        if (key != ui.batt_drawn) {
+            ui.batt_drawn = (int8_t)key;
+            ui.redraw |= R_HEAD;
+        }
+    }
     if (ui.seg_until && now >= ui.seg_until) {
         ui.seg_until = 0;
         ui.redraw |= R_HEAD;
@@ -2244,6 +2290,11 @@ void app_frame(void)
 #ifdef PLAT_HOST
 int app_expect(const char *what, int *got)
 {
+    if (!strncmp(what, "batt", 4) && what[4] >= '0' && what[4] <= '9') {   /* battN: den Akku vorgeben (Tests) */
+        ui.batt_test = (uint8_t)(what[4] - '0');
+        *got = 0;
+        return 1;
+    }
     if (!strcmp(what, "playing"))
         *got = ui.playing;
     else if (!strcmp(what, "step"))
