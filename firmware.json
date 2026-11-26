@@ -1,0 +1,19 @@
+{
+  "schema": 1,
+  "id": "ba55",
+  "name": "BA-55",
+  "author": "swtdr34mz",
+  "license": "MPL-2.0",
+  "tagline": "A bassline after the Erica Synths DB-01: one VCO, sub, noise, detune, an acid filter, drive, accent and slide, a 64-step sequencer",
+  "description": "A monophonic bassline in the manner of the Erica Synths Bassline DB-01: one VCO (triangle, saw, square), a sub-oscillator an octave down, noise, a BBD-style DETUNE, an aggressive 12 dB filter in the Polivoks / Acidbox spirit (low-pass or band-pass, saturating, self-oscillating), DRIVE on one knob, envelopes for VCA, filter and pitch, 303-style ACCENT and SLIDE, three modulators, distortion, chorus and delay/reverb, and a 64-step sequencer with accent, slide, tie, probability, swing and a random pattern generator. 16 presets, MIDI clock in. Unofficial.",
+  "tags": ["synth"],
+  "install": "https://github.com/swtdr34mz-afk/BA-55/releases",
+  "source": "https://github.com/swtdr34mz-afk/BA-55",
+  "screenshot": "site/img/screen-main.png",
+  "hardware": {
+    "models": ["FM-1"],
+    "flash": ["856014", "B36014"],
+    "features": ["usb-audio-in", "usb-audio-out", "velocity", "pressure", "screen-reader"]
+  },
+  "credits": "Built on fm1-base (Charles Vestal) and felucca-bsp (Leo Kuroshita, Hügelton Instruments)."
+}
