@@ -4,16 +4,29 @@
   "name": "BA-55",
   "author": "swtdr34mz",
   "license": "MPL-2.0",
-  "tagline": "A bassline after the Erica Synths DB-01, with only what the DB-01 has: one VCO, sub, noise, BBD detune, overdrive, a Polivoks-style LP/BP filter, its 64-step sequencer, and a GROOVE with a pumping sidechain",
-  "description": "A monophonic bassline after the Erica Synths Bassline DB-01, with only its own controls: one VCO (triangle, saw, square), sub, noise, BBD-style detune, overdrive, FM from the LFO, a saturating 12 dB Polivoks-style LP/BP filter with decay and depth, a sustain-release VCA (fully up: a drone), an LFO with 10 shapes. The DB-01 sequencer: 64 steps with gate, accent, slide, mod track, pitch envelope and probability per step, play modes, shuffle, random patterns with limits, scales and an arpeggiator. Plus GROOVE: ten drum styles with a pumping sidechain. 16 presets, MIDI clock in. Unofficial.",
-  "tags": ["synth"],
+  "tagline": "A bassline after the Erica Synths DB-01: one VCO, sub, noise, BBD detune, a Polivoks-style filter, its 64-step sequencer, plus GROOVE, 12 filterbank effects and a reverb",
+  "description": "A monophonic bassline after the Erica Synths Bassline DB-01: one VCO (triangle, saw, square), sub, noise, BBD detune, overdrive, FM from the LFO, a saturating 12 dB Polivoks-style LP/BP filter, a sustain-release VCA (fully up: a drone), an LFO with 10 shapes. The DB-01 sequencer: 64 steps with accent, slide, mod track, pitch envelope and probability per step, play modes, random patterns, scales, arpeggiator. Plus GROOVE (drums, pumping sidechain), 12 one-knob effects on a 10-band resonant filterbank, and a reverb. 16 presets, MIDI clock in. Unofficial.",
+  "tags": [
+    "synth"
+  ],
   "install": "https://github.com/swtdr34mz-afk/BA-55/releases",
   "source": "https://github.com/swtdr34mz-afk/BA-55",
   "screenshot": "site/img/screen-main.png",
   "hardware": {
-    "models": ["FM-1"],
-    "flash": ["856014", "B36014"],
-    "features": ["usb-audio-in", "usb-audio-out", "velocity", "pressure", "screen-reader"]
+    "models": [
+      "FM-1"
+    ],
+    "flash": [
+      "856014",
+      "B36014"
+    ],
+    "features": [
+      "usb-audio-in",
+      "usb-audio-out",
+      "velocity",
+      "pressure",
+      "screen-reader"
+    ]
   },
   "credits": "Built on fm1-base (Charles Vestal) and felucca-bsp (Leo Kuroshita, Hügelton Instruments)."
 }

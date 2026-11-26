@@ -41,6 +41,9 @@ enum {
     P_RTGT, P_RAMT, P_RLO, P_RHI,
     /* der Arpeggiator */
     P_ADIR, P_AOCT, P_AGATE, P_ALATCH,
+    /* FX: ein Effekt-Preset (Filterbank nach der Erica Synths Resonant Filterbank, Bewegung, Raum), wie stark,
+     * wie bewegt, und der Hall */
+    P_FX, P_FXAMT, P_FXMOT, P_RVMIX,
     BA_NP
 };
 
@@ -74,6 +77,22 @@ extern const char *const BA_ADIR_NAME[BA_NADIR];
 #define BA_NSYNC 12
 extern const char *const BA_SYNC_NAME[BA_NSYNC];   /* LFO im Tempo: die Länge eines Zyklus */
 extern const float BA_SYNC_BEATS[BA_NSYNC];
+/* FX: die zehn Bänder der Filterbank (fest, wie am Original), ihre Formen, die Modulation */
+#define BA_NBANDS 10
+extern const float BA_BAND_HZ[BA_NBANDS];
+enum { FM_OFF, FM_LFO, FM_CLOCK, FM_ENV };
+/* die 12 Effekt-Presets: alles, was die Filterbank und der Hall brauchen; AMOUNT und MOTION fahren sie hoch */
+typedef struct {
+    const char *name;
+    uint8_t band[BA_NBANDS];             /* die Pegel der Bänder: 90 = 0 dB, 127 = +6 dB, 0 = zu */
+    int8_t reso;                         /* bei vollem AMOUNT: -100 .. 100 (negativ: invertierte Rückkopplung) */
+    uint8_t drive, mix, spread;          /* bei vollem AMOUNT, 0 .. 100 */
+    uint8_t mod, depth;                  /* FM_*, und wie tief bei voller MOTION (0 .. 100) */
+    uint8_t rv_size, rv_decay, rv_tone;  /* der Raum, 0 .. 100 */
+} ba_fxpreset;
+#define BA_NFX 12
+extern const ba_fxpreset BA_FXPRESET[BA_NFX];
+extern const char *const BA_FX_NAME[BA_NFX];
 #define BA_NPROB 7
 extern const char *const BA_PROB_NAME[BA_NPROB];   /* 100 %, 75 %, 50 %, 25 %, 1/2, 1/3, 1/4 */
 
@@ -194,10 +213,21 @@ typedef struct {
     ba_drums dr;
     float sc_now;                        /* die Sidechain jetzt: 1 offen, 0 ganz geduckt (Anzeige) */
     uint32_t kick_count;
+    /* FX: die Filterbank */
+    float fb_s1[BA_NBANDS], fb_s2[BA_NBANDS], fb_y[BA_NBANDS], fb_lvl[BA_NBANDS], fb_g[BA_NBANDS];
+    float fb_ph, fb_env;
+    /* FX: der Reverb (sechs Kämme und vier Allpässe je Seite, davor ein Pre-Delay) */
+    float *rv;
+    float *rv_comb[12], *rv_ap[8], *rv_pre, rv_cf[12];
+    int rv_clen[12], rv_cpos[12], rv_alen[8], rv_apos[8], rv_pre_len, rv_pre_pos;
+    float rv_lvl;
     /* Ausgang */
     float mono[256];
     float level_now, cut_hz;
 } ba_engine;
+
+/* FX: der Speicher des Reverbs (den gibt der Host: auf dem FM-1 der RAM-Pool); ohne ihn läuft nur die Filterbank */
+#define BA_RV_FLOATS 19400
 
 /* ------------------------------------------------------------- die Schnittstelle --- */
 void ba_init(ba_engine *e, float sr, ba_patch *pt);
@@ -206,6 +236,10 @@ void ba_groove_use(ba_engine *e, const ba_groove *g);   /* die GROOVE-Einstellun
 int ba_groove_step(const ba_engine *e);  /* 0..31, -1: steht */
 int ba_groove_hit(const ba_engine *e, int lane, int step);
 void ba_render(ba_engine *e, float *l, float *r, int n);   /* n <= 256 */
+void ba_fx_memory(ba_engine *e, float *rv);   /* BA_RV_FLOATS floats für den Reverb (oder 0: ohne Reverb) */
+float ba_band_level(const ba_engine *e, int band);   /* für die Anzeige: was im Band gerade klingt, 0..1 */
+float ba_band_gain(const ba_engine *e, int band);    /* und wie weit es gerade offen ist (mit der Modulation) */
+float ba_reverb_level(const ba_engine *e);
 
 void ba_note_on(ba_engine *e, int note, int vel);
 void ba_note_off(ba_engine *e, int note);

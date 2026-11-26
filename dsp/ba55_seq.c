@@ -421,9 +421,10 @@ void ba_render(ba_engine *e, float *l, float *r, int n)
         }
         done += chunk;
     }
-    for (i = 0; i < n; i++) {            /* mono, wie das Gerät; ein weicher Begrenzer am Ende */
-        float y = ba_soft(out[i] * 0.9f);
-        l[i] = r[i] = y;
+    fx_render(e, out, l, r, n);          /* FX: Filterbank und Reverb (ab hier stereo) */
+    for (i = 0; i < n; i++) {            /* ein weicher Begrenzer am Ende */
+        l[i] = ba_soft(l[i] * 0.9f);
+        r[i] = ba_soft(r[i] * 0.9f);
     }
     if (e->gv && (e->gv->on || e->gqn))  /* GROOVE: die Pumpe und die Drums (ab hier stereo: die Hats leicht verteilt) */
         groove_render(e, l, r, n);

@@ -34,6 +34,25 @@ const float BA_SYNC_BEATS[BA_NSYNC] = {32.0f, 16.0f, 8.0f, 4.0f, 2.0f, 1.0f, 0.6
                                        0.1666667f, 0.125f};
 const char *const BA_PROB_NAME[BA_NPROB] = {"100%", "75%", "50%", "25%", "1/2", "1/3", "1/4"};
 
+const float BA_BAND_HZ[BA_NBANDS] = {29.0f, 61.0f, 115.0f, 218.0f, 411.0f, 777.0f, 1500.0f, 2800.0f, 5200.0f, 11000.0f};
+/*                                band: 29     61    115    218    411    777   1.5k   2.8k   5.2k    11k */
+const ba_fxpreset BA_FXPRESET[BA_NFX] = {
+    {"CLEAN",   {90, 90, 90, 90, 90, 90, 90, 90, 90, 90},           0,   0,   0,  40, FM_OFF,   0,  60, 60, 50},
+    {"ACID",    {70, 90, 80, 90, 120, 127, 120, 70, 40, 20},       85,  50, 100,  30, FM_ENV,  90,  45, 45, 60},
+    {"VOWEL",   {40, 70, 90, 110, 124, 124, 60, 30, 20, 10},       70,  30, 100,  50, FM_LFO,  95,  55, 55, 50},
+    {"WAHWALK", {30, 50, 70, 100, 127, 127, 110, 70, 40, 20},      80,  35, 100,  40, FM_CLOCK, 100, 45, 50, 55},
+    {"HOWL",    {90, 90, 90, 90, 90, 90, 90, 90, 90, 90},         100,  40, 100,  70, FM_LFO,  50,  70, 70, 45},
+    {"PHONE",   {0, 0, 0, 30, 100, 124, 124, 80, 0, 0},            30,  75, 100,  20, FM_LFO,  40,  30, 35, 70},
+    {"SPACE",   {120, 120, 110, 95, 70, 40, 15, 0, 0, 0},          20,  20,  60,  60, FM_LFO,  60, 100, 92, 30},
+    {"COMB",    {0, 120, 0, 120, 0, 120, 0, 120, 0, 120},         -90,  30, 100,  80, FM_LFO,  70,  60, 60, 60},
+    {"GHOST",   {0, 0, 0, 15, 40, 70, 95, 110, 120, 120},          60,  10,  80,  90, FM_LFO,  80, 100, 95, 90},
+    {"MELT",    {120, 110, 95, 70, 50, 50, 70, 95, 110, 120},      70,  25, 100,  60, FM_LFO, 100,  80, 80, 40},
+    {"STROBE",  {120, 0, 120, 0, 120, 0, 120, 0, 120, 0},          60,  50, 100,  70, FM_CLOCK, 100, 40, 40, 60},
+    {"SCREAM",  {70, 90, 80, 110, 127, 127, 127, 90, 50, 20},      95, 100, 100,  40, FM_ENV, 100,  50, 50, 70},
+};
+const char *const BA_FX_NAME[BA_NFX] = {"CLEAN", "ACID", "VOWEL", "WAHWALK", "HOWL", "PHONE", "SPACE", "COMB",
+                                        "GHOST", "MELT", "STROBE", "SCREAM"};
+
 const ba_param_info BA_PARAMS[BA_NP] = {
     {"Wave", "WAVE", 1, MK_LIST, BA_NWAVES, BA_WAVE_NAME},
     {"Sub", "SUB", 40, MK_UNI, 0, 0},
@@ -66,6 +85,10 @@ const ba_param_info BA_PARAMS[BA_NP] = {
     {"Arp Octaves", "OCT", 0, MK_LIST, 3, AOCT_NAME},
     {"Arp Gate", "GATE", 5, MK_LIST, 10, AGATE_NAME},
     {"Arp Latch", "LATCH", 0, MK_SW, 2, SW_ONOFF},
+    {"FX", "FX", 0, MK_LIST, BA_NFX, BA_FX_NAME},
+    {"FX Amount", "AMOUNT", 0, MK_UNI, 0, 0},
+    {"FX Motion", "MOTION", 50, MK_UNI, 0, 0},
+    {"Reverb", "REVERB", 0, MK_UNI, 0, 0},
 };
 
 /* ------------------------------------------------------------- Umrechnungen --- */

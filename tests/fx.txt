@@ -1,0 +1,34 @@
+# FX: one page, four knobs. FX picks one of 12 effects, AMOUNT brings it in, MOTION moves it, REVERB rings on
+wait 2600
+tap FX
+wait 30
+expect page 15
+turn K1 1
+wait 30
+expect p31 12
+turn K2 40
+turn K3 10
+turn K4 30
+wait 30
+tap PLAY
+wav fx.wav
+wait 1500
+shot fx_acid.png
+turn K1 6
+wait 1200
+shot fx_space.png
+turn K1 3
+turn K2 30
+wait 1200
+shot fx_melt.png
+turn K1 2
+turn K3 30
+wait 1200
+shot fx_scream.png
+wavstop
+expect peak_db_min -30
+tap PLAY
+wait 100
+tap FX
+wait 30
+expect page 15

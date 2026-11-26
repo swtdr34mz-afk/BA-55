@@ -69,10 +69,28 @@ static int patch_ok(const ba_patch *p)
 
 static ba_patch *slot_patch(int s) { return &bank[s >= 8].p[s & 7]; }
 
+/* ein Klang aus v0.1 (vor den FX: 31 Parameter, 426 Bytes) in die neue Form: alles bleibt, die FX kommen aus
+ * (MIX 0), mit ihren Standardwerten. old darf im selben Speicher liegen (es wird zuerst kopiert) */
+#define V1_NP 31
+#define V1_PATCH 426
+static void patch_from_v1(const uint8_t *old, ba_patch *np)
+{
+    uint8_t o[V1_PATCH];
+    memcpy(o, old, V1_PATCH);
+    ba_patch_init(np);
+    memcpy(np->name, o, BA_NAMELEN);
+    memcpy(&np->bpm, o + BA_NAMELEN, 2);
+    memcpy(np->p, o + BA_NAMELEN + 2, V1_NP);
+    memcpy(np->seq, o + BA_NAMELEN + 2 + V1_NP, sizeof np->seq);
+}
+
 static void bank_load(int b)
 {
-    int i, ok = plat_store_load(OBJ_BANK_A + (uint32_t)b, &bank[b], sizeof bank[b]) == (int)sizeof bank[b]
-                && bank[b].magic == BANK_MAGIC;
+    int i, got = plat_store_load(OBJ_BANK_A + (uint32_t)b, &bank[b], sizeof bank[b]), ok;
+    if (got == 4 + 8 * V1_PATCH && bank[b].magic == BANK_MAGIC)   /* eine Bank aus v0.1: von hinten nach vorn umsetzen */
+        for (i = 7; i >= 0; i--)
+            patch_from_v1((const uint8_t *)&bank[b] + 4 + i * V1_PATCH, &bank[b].p[i]);
+    ok = (got == (int)sizeof bank[b] || got == 4 + 8 * V1_PATCH) && bank[b].magic == BANK_MAGIC;
     for (i = 0; ok && i < 8; i++)
         ok = patch_ok(&bank[b].p[i]);
     if (!ok) {
@@ -97,7 +115,12 @@ static void edited(void)
 
 static void settings_load(void)
 {
-    if (plat_store_load(OBJ_SETTINGS, &set, sizeof set) != (int)sizeof set || set.magic != SET_MAGIC
+    int off = (int)__builtin_offsetof(settings_t, edit), got = plat_store_load(OBJ_SETTINGS, &set, sizeof set);
+    if (got == ((off + V1_PATCH + 3) & ~3) && set.magic == SET_MAGIC) {   /* aus v0.1: der Klang in Arbeit bleibt */
+        patch_from_v1((const uint8_t *)&set + off, &set.edit);
+        got = (int)sizeof set;
+    }
+    if (got != (int)sizeof set || set.magic != SET_MAGIC
         || set.slot >= NSLOTS || !patch_ok(&set.edit) || set.oct > 6u || set.bend < 1u || set.bend > 12u
         || set.mch > 16u || set.tune > 20u || set.grv.style >= BA_NSTYLES || set.grv.kick > 127u
         || set.grv.drums > 127u || set.grv.pump > 127u || set.grv.rel > 127u || set.grv.hats > 127u
@@ -152,10 +175,10 @@ static void e_arp(int on)
 
 /* ------------------------------------------------------------------ Seiten --- */
 enum { PG_VCO, PG_VCF, PG_ENV, PG_LFO, PG_LFO2, PG_STEP, PG_STEP2, PG_STEP3, PG_PATT, PG_SETUP, PG_RND, PG_SCALE,
-       PG_ARP, PG_GRV, PG_GSET, NPAGES };
+       PG_ARP, PG_GRV, PG_GSET, PG_FX, NPAGES };
 static const char *const PAGE_NAME[NPAGES] = {"VCO", "VCF", "ENV", "LFO", "LFO", "STEP", "STEP MOD", "STEP PITCH ENV",
                                               "PATTERN", "SETTINGS", "RND PATT", "SCALE", "ARPEGGIATOR", "GROOVE",
-                                              "GROOVE SETUP"};
+                                              "GROOVE SETUP", "FX"};
 
 enum { K_NONE, K_PARAM, K_SSEL, K_SNOTE, K_SGATE, K_SFL, K_SMOD, K_SPROB, K_SPED, K_SPEK, K_TEMPO, K_TUNE, K_MCH,
        K_BEND, K_GRV };
@@ -178,6 +201,7 @@ static const kdef PAGE_K[NPAGES][4] = {
     {{K_PARAM, P_ADIR}, {K_PARAM, P_AOCT}, {K_PARAM, P_AGATE}, {K_PARAM, P_ALATCH}},
     {{K_GRV, GV_STYLE}, {K_GRV, GV_KICK}, {K_GRV, GV_DRUMS}, {K_GRV, GV_PUMP}},
     {{K_GRV, GV_REL}, {K_GRV, GV_HATS}, {K_GRV, GV_TUNE}, {K_GRV, GV_VAR}},
+    {{K_PARAM, P_FX}, {K_PARAM, P_FXAMT}, {K_PARAM, P_FXMOT}, {K_PARAM, P_RVMIX}},
 };
 
 static uint8_t *grv_field(int f)
@@ -211,8 +235,10 @@ static struct {
     uint8_t rec_used;                    /* REC wurde mit SELECT benutzt (die Mod-Spur) */
     int8_t key_note[NKEYS];
     int32_t step_drawn, note_drawn;
-    int8_t batt_drawn;                   /* der Akku, wie er gezeichnet ist (Blinken: mit Halbsekunde) */
+    int16_t batt_drawn;                  /* der Akku, wie er gezeichnet ist (Prozent, USB, Blinken mit Halbsekunde) */
+    int8_t batt_pct;                     /* die angezeigten Prozent (-1: noch keine), mit etwas Hysterese */
     uint8_t batt_test;
+    int8_t batt_tpct;                    /* (Tests: vorgegebene Prozent, -1 keine) */
     uint32_t load_at;
     uint8_t hot;
     float lfo_scope[96];
@@ -465,6 +491,22 @@ static void val_text(kdef d, char *t)
             default: text_cat(t, "-"); return;
             }
         case P_RAMT: int_text(v * 100 / 127, t); text_cat(t, "%"); return;
+        case P_FXAMT: int_text(v * 100 / 127, t); text_cat(t, "%"); return;
+        case P_RVMIX: int_text(v * 100 / 127, t); text_cat(t, "%"); return;
+        case P_FXMOT:                    /* je nach Effekt: Hz, eine Teilung im Takt, oder wie schnell */
+            if (v < 2) {
+                text_cat(t, "STILL");
+                return;
+            }
+            switch (BA_FXPRESET[ba_list_index(P_FX, edit.p[P_FX])].mod) {
+            case FM_CLOCK: {
+                static const char *const D[6] = {"1 BAR", "1/2", "1/4", "1/8", "1/16", "1/32"};
+                text_cat(t, D[(v * 5 + 63) / 127]);
+                return;
+            }
+            case FM_LFO: hz_text(0.1f * fm_exp2f((float)v / 127.0f * 6.6f), t); return;
+            default: int_text(v * 100 / 127, t); text_cat(t, "%"); return;
+            }
         default: break;
         }
         int_text(v * 100 / 127, t);
@@ -821,6 +863,7 @@ static void button(uint32_t i)
     case B_SEQ: page_set(ui.page == PG_STEP ? PG_STEP2 : ui.page == PG_STEP2 ? PG_STEP3 : PG_STEP); break;
     case B_GLO: page_set(ui.page == PG_PATT ? PG_SETUP : PG_PATT); break;
     case B_EDIT: page_set(ui.page == PG_RND ? PG_SCALE : PG_RND); break;
+    case B_FX: page_set(PG_FX); break;   /* FX: eine Seite, vier Regler */
     case B_PLAY: play_toggle(); break;
     case B_REC:
         ui.rec_t = plat_ms();            /* was REC tut, entscheidet das Loslassen (oder 1 s Halten) */
@@ -981,7 +1024,7 @@ void app_input_only(void) { input(); }
 static void lights(void)
 {
     static const uint8_t PAGE_BTN[NPAGES] = {B_HOME, B_SEL, B_ENV, B_LFO, B_LFO, B_SEQ, B_SEQ, B_SEQ, B_GLO, B_GLO,
-                                             B_EDIT, B_EDIT, B_ARP, B_HOME, B_HOME};
+                                             B_EDIT, B_EDIT, B_ARP, B_HOME, B_HOME, B_FX};
     uint32_t btn = 1u << PAGE_BTN[ui.page], dimb, lit = 0, k;
     if (ui.playing)
         btn |= LED_PLAY_GREEN;
@@ -1392,8 +1435,8 @@ static void draw_knob(int k, int32_t cx, int32_t y, uint32_t now)
 /* ---- die Seitengruppen: kleine LEDs ---- */
 static void group_of(int pg, int *i, int *n)
 {
-    static const uint8_t G0[NPAGES] = {0, 0, 0, 0, 1, 0, 1, 2, 0, 1, 0, 1, 0, 1, 2};
-    static const uint8_t GN[NPAGES] = {3, 1, 1, 2, 2, 3, 3, 3, 2, 2, 2, 2, 1, 3, 3};
+    static const uint8_t G0[NPAGES] = {0, 0, 0, 0, 1, 0, 1, 2, 0, 1, 0, 1, 0, 1, 2, 0};
+    static const uint8_t GN[NPAGES] = {3, 1, 1, 2, 2, 3, 3, 3, 2, 2, 2, 2, 1, 3, 3, 1};
     *i = G0[pg];
     *n = GN[pg];
 }
@@ -1684,6 +1727,38 @@ static void show_arp(void)               /* ARP: die Richtung als Treppe über d
     }
 }
 
+/* FX: links die zehn Bänder als Fader-Säulen (wie weit offen, mit der Bewegung), darüber als heller Punkt, was
+ * gerade darin klingt (ein kleiner Spektrum-Analysator); rechts der Hall als roter Nebel, so dicht wie REVERB und
+ * so hoch, wie er gerade klingt */
+static void show_fx(void)
+{
+    int b, y, c, x;
+    float rv = (float)edit.p[P_RVMIX] / 127.0f, rl = sat01(ba_reverb_level(&eng) * 4.0f);
+    uint32_t r = 2463534242u + (plat_ms() / 120u) * 2654435761u;
+    for (b = 0; b < BA_NBANDS; b++) {
+        int x0 = 1 + b * 6, h = (int)(sat01(ba_band_gain(&eng, b) * 0.5f) * (float)(MX_H - 3) + 0.5f);
+        int lv = (int)(fm_sqrtf(ba_band_level(&eng, b)) * (float)(MX_H - 2) + 0.5f);
+        int on = edit.p[P_FXAMT] >= 2;
+        for (y = 0; y < h; y++)
+            for (c = 0; c < 4; c++)
+                mx_dot(x0 + c, MX_H - 1 - y, on ? 95 : 35);
+        if (on && lv > 0)
+            for (c = 0; c < 4; c++)
+                mx_dot(x0 + c, MX_H - 1 - (lv < MX_H - 1 ? lv : MX_H - 1), 255);
+    }
+    for (y = 0; y < MX_H; y += 2)
+        mx_dot(61, y, 50);
+    for (x = 63; x < MX_W; x++)          /* der Hall */
+        for (y = 0; y < MX_H; y++) {
+            float a = (float)(MX_H - 1 - y) / (float)MX_H, top = 0.35f + 0.6f * rl;
+            r ^= r << 13;
+            r ^= r >> 17;
+            r ^= r << 5;
+            if (rv > 0.01f && a < top && (float)(r & 255u) < (80.0f + 175.0f * rv) * (1.0f - a / top))
+                mx_dot(x, y, 60 + (int)(170.0f * (1.0f - a / top) * (0.4f + 0.6f * rl)));
+        }
+}
+
 static void show_groove(void)            /* GROOVE: die fünf Spuren über zwei Takte, der laufende Step hell; unten die Pumpe */
 {
     int lane, i, cur = ba_groove_step(&eng), x;
@@ -1742,7 +1817,8 @@ static void show_glo(void)               /* SETTINGS: das Tempo im Takt, die Las
 static int view_animated(void)
 {
     return ui.page == PG_VCO || ui.page == PG_VCF || ui.page == PG_ENV || ui.page == PG_LFO || ui.page == PG_LFO2
-           || ui.page == PG_SETUP || (ui.page == PG_ARP && ui.arp) || ui.page == PG_GRV || ui.page == PG_GSET;
+           || ui.page == PG_SETUP || (ui.page == PG_ARP && ui.arp) || ui.page == PG_GRV || ui.page == PG_GSET
+           || ui.page == PG_FX;
 }
 
 static const char *view_title(char *t)
@@ -1785,13 +1861,24 @@ static const char *view_title(char *t)
     case PG_GSET:
         text_cat(t, set.grv.on ? BA_STYLE_NAME[set.grv.style] : "GROOVE OFF");
         return t;
+    case PG_FX: {                        /* welches der 12, oder aus */
+        char n[8];
+        if (edit.p[P_FXAMT] < 2 && edit.p[P_RVMIX] < 2)
+            return "FX OFF";
+        int_text(ba_list_index(P_FX, edit.p[P_FX]) + 1, n);
+        text_cat(t, n);
+        text_cat(t, "/12");
+        return t;
+    }
     default: text_cat(t, eng.ext ? "MIDI CLOCK" : "TEMPO"); return t;
     }
 }
 
 /* ---- der Akku: unter dem Namen, immer zu sehen. plat_battery: 0..3 Balken, 4 Strom über USB, -1 nicht gelesen
- *      (die Browser-Version hat keinen Akku: dann nichts). Wie eine Gerätebeschriftung: ein weißer Rahmen, drei
- *      rote LED-Zellen; leer blinkt die erste Zelle, an USB leuchten alle drei mit einem kleinen Blitz ---- */
+ *      (die Browser-Version hat keinen Akku: dann nichts). Wie eine Gerätebeschriftung: ein weißer Rahmen, darin ein
+ *      roter LED-Balken, der sich stufenlos füllt, daneben die Prozent; unter 15 % rot, unter 8 % blinkt er; an USB
+ *      voll mit einem kleinen Blitz. Die Prozent kommen aus der Messung der Zellspannung (plat_battery_raw): die drei
+ *      Balken der Plattform liegen bei 531 / 561 / 591, eine volle Zelle um 615 ---- */
 static int batt_level(void)
 {
 #ifdef PLAT_HOST
@@ -1801,22 +1888,59 @@ static int batt_level(void)
     return plat_battery();
 }
 
+static int batt_raw_pct(void)            /* aus der Messung: 0..100, -1 keine Messung */
+{
+    int32_t raw;
+#ifdef PLAT_HOST
+    if (ui.batt_tpct >= 0)
+        return ui.batt_tpct;
+#endif
+    raw = plat_battery_raw();
+    if (raw <= 0)
+        return -1;
+    raw = (raw - 515) * 100 / 100;       /* 515 leer .. 615 voll */
+    return raw < 0 ? 0 : raw > 100 ? 100 : (int)raw;
+}
+
+static int batt_percent(int lvl)         /* die angezeigten Prozent, ohne Zappeln: erst ab 2 Punkten Unterschied */
+{
+    int p = batt_raw_pct();
+    if (p < 0)                           /* (noch keine Messung: aus den Balken) */
+        p = lvl >= 4 ? 100 : lvl * 33;
+    if (ui.batt_pct < 0 || p >= ui.batt_pct + 2 || p <= ui.batt_pct - 2 || p == 0 || p == 100)
+        ui.batt_pct = (int8_t)p;
+    return ui.batt_pct;
+}
+
 static void batt_icon(float x, float y, int lvl, uint32_t now)
 {
-    int i, blink = lvl == 0 && (now / 500u) & 1u;
+    int usb = lvl >= 4, pct = usb ? 100 : batt_percent(lvl), low = !usb && pct < 15;
+    int blink = !usb && pct < 8 && ((now / 500u) & 1u);
+    float w = 14.0f * (float)pct / 100.0f, full;
     col3 off = rgb3(48, 11, 18);
     rframe(x + 0.5f, y + 0.5f, x + 16.5f, y + 8.5f, 1.5f, c3(C_LINE), 0.85f);
     rrect((int32_t)x + 17, (int32_t)y + 3, 2, 3, 0.5f, c3(C_LINE), c3(C_LINE), 0.85f);
-    for (i = 0; i < 3; i++) {
-        int on = lvl >= 4 || i < lvl || (i == 0 && blink);
-        rrect((int32_t)x + 2 + i * 5, (int32_t)y + 2, 4, 5, 0.8f, on ? red3() : off, on ? red3() : off, 1.0f);
-        if (on)
-            bloom(x + 4.0f + (float)i * 5.0f, y + 4.5f, 4.0f, red3(), 0.18f);
-    }
-    if (lvl >= 4) {                      /* Strom über USB: ein kleiner Blitz rechts neben dem Akku */
+    rrect((int32_t)x + 2, (int32_t)y + 2, 14, 5, 0.8f, off, off, 1.0f);
+    if (blink)
+        w = 0.0f;
+    else if (w < 1.0f && pct > 0)
+        w = 1.0f;
+    full = (float)(int)w;
+    if (full >= 1.0f)                    /* die ganzen Pixel, dann der angebrochene als Halbton: stufenlos */
+        rrect((int32_t)x + 2, (int32_t)y + 2, (int32_t)full, 5, 0.8f, red3(), red3(), 1.0f);
+    if (w - full > 0.05f)
+        rrect((int32_t)x + 2 + (int32_t)full, (int32_t)y + 2, 1, 5, 0.0f, red3(), red3(), w - full);
+    if (w > 0.0f)
+        bloom(x + 2.0f + w * 0.5f, y + 4.5f, 3.0f + w * 0.5f, red3(), 0.16f);
+    if (usb) {                           /* Strom über USB: ein kleiner Blitz rechts neben dem Akku */
         aa_line(x + 24.0f, y + 0.5f, x + 22.0f, y + 4.5f, c3(C_WHITE), 0.95f);
         aa_line(x + 22.0f, y + 4.5f, x + 25.0f, y + 4.5f, c3(C_WHITE), 0.95f);
         aa_line(x + 25.0f, y + 4.5f, x + 23.0f, y + 8.5f, c3(C_WHITE), 0.95f);
+    } else {
+        char n[8];
+        int_text(pct, n);
+        text_cat(n, "%");
+        cv_text((int32_t)x + 22, (int32_t)y - 1, &FONT_XS, n, low ? C_RED : C_SUB);
     }
 }
 
@@ -1908,6 +2032,7 @@ static void draw_low(void)
         case PG_ARP: show_arp(); break;
         case PG_GRV:
         case PG_GSET: show_groove(); break;
+        case PG_FX: show_fx(); break;
         default: show_glo(); break;
         }
         mx_draw(15);
@@ -2092,6 +2217,8 @@ static void intro_draw(float t)
 }
 
 /* ------------------------------------------------------------ der Vertrag --- */
+static float fx_rv[BA_RV_FLOATS] __attribute__((section(".pool")));
+
 void app_init(void)
 {
     int i;
@@ -2102,6 +2229,7 @@ void app_init(void)
     eng.bend_range = (float)set.bend;
     eng.tune_hz = 430.0f + (float)set.tune;
     ba_groove_use(&eng, &set.grv);
+    ba_fx_memory(&eng, fx_rv);           /* der Reverb: sein Speicher im RAM-Pool */
     for (i = 0; i < NKEYS; i++)
         ui.key_note[i] = -1;
     ui.copied = -1;
@@ -2178,6 +2306,8 @@ void app_ui_init(void)
     ui.step_drawn = -2;
     ui.note_drawn = -2;
     ui.batt_drawn = -9;
+    ui.batt_pct = -1;
+    ui.batt_tpct = -1;
     ui.intro = 1;
     ui.intro_at = plat_ms();
     ui.redraw = R_ALL;
@@ -2239,7 +2369,8 @@ void app_frame(void)
         }
     }
     {   /* der Akku: neu zeichnen, wenn er sich ändert; leer blinkt er im Halbsekundentakt */
-        int lvl = batt_level(), key = lvl == 0 ? 10 + (int)((now / 500u) & 1u) : lvl;
+        int lvl = batt_level(), p = lvl < 0 ? -1 : lvl >= 4 ? 200 : batt_percent(lvl);
+        int key = lvl < 0 ? -1 : p + (p < 8 ? 300 * (int)((now / 500u) & 1u) : 0);
         if (key != ui.batt_drawn) {
             ui.batt_drawn = (int8_t)key;
             ui.redraw |= R_HEAD;
@@ -2292,6 +2423,12 @@ int app_expect(const char *what, int *got)
 {
     if (!strncmp(what, "batt", 4) && what[4] >= '0' && what[4] <= '9') {   /* battN: den Akku vorgeben (Tests) */
         ui.batt_test = (uint8_t)(what[4] - '0');
+        *got = 0;
+        return 1;
+    }
+    if (!strncmp(what, "bpct", 4)) {     /* bpctN: die Prozent vorgeben (Tests) */
+        ui.batt_tpct = (int8_t)atoi(what + 4);
+        ui.batt_pct = -1;
         *got = 0;
         return 1;
     }
