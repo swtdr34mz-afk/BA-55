@@ -7,8 +7,6 @@
 #include <stdio.h>
 
 #define SR 44100
-static int16_t DL[BA_DLY_FRAMES], DR[BA_DLY_FRAMES];
-static float CHO[BA_CHO_FRAMES], REV[BA_REV_FLOATS], WIDE[BA_WIDE_FRAMES];
 static ba_engine E;
 static ba_patch P;
 
@@ -20,7 +18,6 @@ static void measure(const ba_patch *src, int seq, double *db, double *hi, double
     float pl = 0;
     P = *src;
     ba_init(&E, SR, &P);
-    ba_fx_memory(&E, DL, DR, CHO, REV, WIDE);
     if (seq)
         ba_play(&E, 1);
     else
@@ -48,23 +45,14 @@ int main(void)
     int id, dead = 0;
     ba_patch base;
     ba_patch_init(&base);
-    base.p[P_X1MIX] = 60;
-    base.p[P_X2MIX] = 60;
-    base.p[P_X3MIX] = 60;
+    base.p[P_LFOLVL] = 60;               /* der LFO wirkt, damit seine Regler etwas ändern */
     for (id = 0; id < BA_NP; id++) {
         ba_patch a = base, b = base;
         double da, ha, wa, db, hb, wb;
         a.p[id] = 0;
         b.p[id] = 127;
-        if (id >= P_M1 && id < P_M1 + 3 * MO_N) {   /* ein Modulator: auf den Cutoff, im passenden Modus */
-            int m = (id - P_M1) / MO_N, o = (id - P_M1) % MO_N, mode = o >= MO_RRATE ? (o == MO_SCOUNT ? 127 : 85) : o >= MO_EA ? 42 : 0;
-            a.lvl[m][D_CUT] = b.lvl[m][D_CUT] = 127;
-            if (o != MO_MODE)
-                a.p[P_MOD(m) + MO_MODE] = b.p[P_MOD(m) + MO_MODE] = (uint8_t)mode;
-            a.mstep[m][1] = b.mstep[m][1] = 127;
-        }
-        measure(&a, id >= P_SLEN, &da, &ha, &wa);
-        measure(&b, id >= P_SLEN, &db, &hb, &wb);
+        measure(&a, id >= P_LAST, &da, &ha, &wa);
+        measure(&b, id >= P_LAST, &db, &hb, &wb);
         if (fabs(da - db) < 0.3 && fabs(ha - hb) < 0.01 * (ha + hb + 1e-6) && fabs(wa - wb) < 0.5) {
             printf("NO EFFECT %-24s  %6.1f dB %6.3f | %6.1f dB %6.3f\n", BA_PARAMS[id].name, da, ha, db, hb);
             dead++;

@@ -1,7 +1,7 @@
 # Credits
 
-BA-55 by swtdr34mz. All of its own code (the voice, the sequencer, the screens) is written for this project; the sound
-core grew out of swtdr34mz's MONSUN. All sounds are synthesized in the firmware: no samples. The concept and the look
+BA-55 by swtdr34mz. All of its own code (the voice, the sequencer, the screens) is written for this project. All sounds
+are synthesized in the firmware: no samples. The concept and the look
 follow the Erica Synths Bassline DB-01; no code, sound or artwork of theirs is used. The filter is a state-variable
 filter after Vadim Zavalishin's published topology-preserving form, with saturating integrators.
 

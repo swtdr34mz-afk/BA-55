@@ -1,11 +1,11 @@
 # BA-55 in the host simulator:
 #   X0X_FONTSET=terminus python3 fm1-base/tools/build.py . --host, then build/host/ba55_host tests/basic.txt build/host
 splashshot splash.png
-wait 400
+wait 300
 shot intro1.png
 wait 900
 shot intro2.png
-wait 1300
+wait 1400
 expect page 0
 expect slot 0
 expect bpm 126
@@ -24,60 +24,40 @@ wait 400
 wavstop
 expect peak_db_min -30
 expect gate 0
-# the filter page and SELECT (cutoff)
+# the VCF page and SELECT (cutoff)
 tap SEL
 wait 30
 expect page 1
 key 7 down 100
 wait 250
 turn SELECT 5
-wait 1000
+wait 600
 shot filter.png
 key 7 up
-# VCF 2: MODE to band-pass
-tap SEL
+turn K3 1
 wait 30
-expect page 2
-turn K1 1
-wait 30
-expect p7 127
-turn K1 -1
-# the VCA envelope, the filter envelope, the pitch envelope
+expect p10 127
+turn K3 -1
+# ENV, LFO, LFO 2
 key 7 down 100
 tap ENV
 wait 120
-expect page 3
-tap ENV
-wait 120
-expect page 4
-shot fenv.png
+expect page 2
+shot env.png
 key 7 up
-tap ENV
-wait 30
-expect page 5
-shot penv.png
-# the modulators: M1, M1 DEST
 tap LFO
 wait 30
-expect page 6
-shot m1.png
+expect page 3
+turn K3 20
+wait 400
+shot lfo.png
 tap LFO
 wait 30
-expect page 7
-turn K1 4
-turn K2 10
-wait 30
-expect dest 4
-shot m1dest.png
-# FX
-tap FX
-wait 30
-expect page 14
-shot fx.png
-# the sequencer: play
+expect page 4
+# the step pages: play
 tap SEQ
 wait 30
-expect page 20
+expect page 5
 tap PLAY
 wav seq.wav
 wait 2500
@@ -85,7 +65,24 @@ wavstop
 expect playing 1
 expect peak_db_min -30
 shot seq.png
-# a key while it plays transposes: the step notes stay as they are
+# REC held and SELECT turned while it plays: the mod track
+press REC
+wait 30
+turn SELECT 6
+wait 30
+release REC
+wait 30
+expect rec 0
+expect edited 1
+tap SEQ
+wait 30
+expect page 6
+shot step2.png
+tap SEQ
+wait 30
+expect page 7
+shot step3.png
+# a key while it plays transposes: the step notes stay
 key 9 down 100
 wait 300
 key 9 up
@@ -93,51 +90,80 @@ expect seqnote1 33
 tap PLAY
 wait 100
 expect playing 0
-# RECORD: two keys into steps 1 and 2
+# RECORD on a step page: two keys into steps 1 and 2
+tap SEQ
+wait 30
+expect page 5
 tap REC
 wait 30
 expect rec 1
 key 7 down 90
 wait 100
 key 7 up
-key 11 down 120
+key 11 down 90
 wait 100
 key 11 up
 expect seqnote1 60
 expect seqnote2 64
 expect ssel 2
-expect seqfl1 0
-expect seqfl2 1
 shot rec.png
 tap REC
+wait 30
 expect rec 0
-# SEQ SETUP: ARP makes a random pattern
-tap SEQ
+# OCT+ on a step page: the step's octave
+turn K1 -2
+tap OCT+
 wait 30
-expect page 21
+expect seqnote1 72
+# RND PATT: REC makes a new pattern
+tap EDIT
+wait 30
+expect page 10
+tap REC
+wait 60
+shot rnd.png
+tap EDIT
+wait 30
+expect page 11
+shot scale.png
+# PATTERN, SETTINGS
+tap GLO
+wait 30
+expect page 8
+turn K2 3
+wait 30
+shot pattern.png
+tap GLO
+wait 30
+expect page 9
+turn K1 2
+wait 30
+expect tune 12
+shot setup.png
+# the arpeggiator
+tap FX
+wait 30
+expect page 12
 tap ARP
-wait 30
-expect edited 1
-shot random.png
+expect arp 1
+key 7 down 100
+key 11 down 100
+key 14 down 100
+wait 600
+shot arp.png
+key 7 up
+key 11 up
+key 14 up
+tap ARP
+expect arp 0
 # DRIVE on ALGORITHM
 turn ALGO 20
 wait 30
-expect edited 1
 # presets: the next slot
 turn PRESET 1
 wait 100
 expect slot 1
 expect edited 0
 shot preset.png
-# global page
-tap GLO
-wait 30
-expect page 18
-shot glo.png
-# HOLD
-tap ARP
-expect hold 1
-tap ARP
-expect hold 0
 wait 2000
 expect dirty 0

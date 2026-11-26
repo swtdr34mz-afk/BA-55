@@ -3,119 +3,84 @@
 /* BA-55 – die Parameterliste (FM-1 und VST lesen dieselbe) und die Umrechnungen. Teil von ba55_core.c */
 
 static const char *const SW_ONOFF[2] = {"OFF", "ON"};
-static const char *const SW_SYNC3[2] = {"FREE", "BPM"};
-static const char *const GMODE_NAME[2] = {"ON", "AUTO"};
-static const char *const SYNC_NAME[4] = {"FREE", "KEY", "BPM", "BPM KEY"};
-static const char *const LWAVE_NAME[5] = {"TRI", "SQUARE", "PULSE 25", "TRAPEZ", "CHAOS SAW"};
-static const char *const DVS_NAME[BA_NDVS] = {"1", "2", "3", "4", "6", "8", "12", "16", "24", "32"};
-
-const char *const BA_MODE_NAME[BA_NMODES] = {"LFO", "ENV", "RANDOM", "STEP"};
-const char *const BA_X1_NAME[BA_NX1] = {"HARD CLIP", "FOLDBACK", "S-CURVE", "TRI CLIP", "SHRED", "BIT CRUSH"};
-const char *const BA_X2_NAME[BA_NX2] = {"CHORUS", "ENSEMBLE", "FLANGER"};
-const char *const BA_X3_NAME[BA_NX3] = {"DELAY", "PING PONG", "LARGE REV", "SOFT REV"};
-const char *const BA_DEST_NAME[BA_NDEST] = {"CV", "SUB", "NOI", "PW", "CUT", "VCA", "DRV", "DET", "FX2", "FX3",
-                                            "RES", "EGL", "HPF"};
-const char *const BA_DEST_LONG[BA_NDEST] = {"PITCH", "SUB LEVEL", "NOISE", "PULSE WIDTH", "CUTOFF", "VCA",
-                                            "DRIVE", "DETUNE", "FX2 MIX", "FX3 MIX", "RESONANCE",
-                                            "ENV MOD", "HIGH PASS"};
 static const char *const FMODE_NAME[2] = {"LP", "BP"};
-const char *const BA_DIV_NAME[BA_NDIV] = {"4 BARS", "2 BARS", "1 BAR", "1/2", "1/4", "1/4T", "1/8", "1/8T", "1/16",
-                                          "1/16T", "1/32", "1/64"};
-const float BA_DIV_BEATS[BA_NDIV] = {16.0f, 8.0f, 4.0f, 2.0f, 1.0f, 0.6666667f, 0.5f, 0.3333333f, 0.25f, 0.1666667f,
-                                     0.125f, 0.0625f};
-const uint8_t BA_DVS[BA_NDVS] = {1, 2, 3, 4, 6, 8, 12, 16, 24, 32};
-const char *const BA_WAVE_NAME[BA_NWAVES] = {"TRI", "SAW", "SQR"};
+static const char *const LSYNC_NAME[2] = {"FREE", "BPM"};
+static const char *const AOCT_NAME[3] = {"1", "2", "3"};
+static const char *const AGATE_NAME[10] = {"10%", "20%", "30%", "40%", "50%", "60%", "70%", "80%", "90%", "100%"};
 
-#define MOD_PARAMS(n)                                                                    \
-    {"M" n " Mode", "MODE", 0, MK_LIST, BA_NMODES, BA_MODE_NAME},                       \
-    {"M" n " Sync", "SYNC", 0, MK_LIST, 4, SYNC_NAME},                                  \
-    {"M" n " LFO Rate", "RATE", 60, MK_UNI, 0, 0},                                      \
-    {"M" n " LFO Wave", "WAVE", 0, MK_LIST, 5, LWAVE_NAME},                             \
-    {"M" n " LFO Fade", "FADE", 64, MK_BIP, 0, 0},                                      \
-    {"M" n " Env Attack", "A", 10, MK_UNI, 0, 0},                                       \
-    {"M" n " Env Decay/Release", "D/R", 60, MK_UNI, 0, 0},                              \
-    {"M" n " Env Sustain", "S", 0, MK_UNI, 0, 0},                                       \
-    {"M" n " Random Rate", "RATE", 60, MK_UNI, 0, 0},                                   \
-    {"M" n " Random Lag", "LAG", 20, MK_UNI, 0, 0},                                     \
-    {"M" n " Random Probability", "PROB", 127, MK_UNI, 0, 0},                           \
-    {"M" n " Steps", "#", 7, MK_LIST, BA_MSTEPS, 0}
+const char *const BA_WAVE_NAME[BA_NWAVES] = {"TRI", "SAW", "SQR"};
+const char *const BA_SHAPE_NAME[BA_NSHAPES] = {"SINE", "TRI", "SAW", "RAMP", "SQUARE", "3 DEC SAW", "SAW+TRI",
+                                               "3 RAMP", "S&H", "NOISE"};
+const char *const BA_PMODE_NAME[BA_NPMODES] = {"FWD", "BWD", "RND", "PP", "PP2"};
+const char *const BA_SCALE_NAME[BA_NSCALES] = {"CHROM", "MAJOR", "MINOR", "MAJ PEN", "MIN PEN", "WHOLE",
+                                               "MAJ BLU", "MIN BLU"};
+const uint16_t BA_SCALE_MASK[BA_NSCALES] = {
+    0xFFF,                                              /* chromatisch */
+    1 | 1 << 2 | 1 << 4 | 1 << 5 | 1 << 7 | 1 << 9 | 1 << 11,   /* Dur */
+    1 | 1 << 2 | 1 << 3 | 1 << 5 | 1 << 7 | 1 << 8 | 1 << 10,   /* Moll */
+    1 | 1 << 2 | 1 << 4 | 1 << 7 | 1 << 9,              /* Dur-Pentatonik */
+    1 | 1 << 3 | 1 << 5 | 1 << 7 | 1 << 10,             /* Moll-Pentatonik */
+    1 | 1 << 2 | 1 << 4 | 1 << 6 | 1 << 8 | 1 << 10,    /* Ganzton */
+    1 | 1 << 2 | 1 << 3 | 1 << 4 | 1 << 7 | 1 << 9,     /* Dur-Blues */
+    1 | 1 << 3 | 1 << 5 | 1 << 6 | 1 << 7 | 1 << 10,    /* Moll-Blues */
+};
+const char *const BA_NOTE_NAME[12] = {"C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"};
+const char *const BA_RTGT_NAME[BA_NRTGT] = {"PATTERN", "NOTES", "GATES", "ACCENT", "SLIDE", "MOD", "PITCH ENV",
+                                            "PROB", "STEP ON"};
+const char *const BA_ADIR_NAME[BA_NADIR] = {"UP", "DOWN", "UP&DOWN", "RANDOM"};
+const char *const BA_SYNC_NAME[BA_NSYNC] = {"8 BARS", "4 BARS", "2 BARS", "1 BAR", "1/2", "1/4", "1/4T", "1/8",
+                                            "1/8T", "1/16", "1/16T", "1/32"};
+const float BA_SYNC_BEATS[BA_NSYNC] = {32.0f, 16.0f, 8.0f, 4.0f, 2.0f, 1.0f, 0.6666667f, 0.5f, 0.3333333f, 0.25f,
+                                       0.1666667f, 0.125f};
+const char *const BA_PROB_NAME[BA_NPROB] = {"100%", "75%", "50%", "25%", "1/2", "1/3", "1/4"};
 
 const ba_param_info BA_PARAMS[BA_NP] = {
     {"Wave", "WAVE", 1, MK_LIST, BA_NWAVES, BA_WAVE_NAME},
-    {"Sub Level", "SUB", 40, MK_UNI, 0, 0},
+    {"Sub", "SUB", 40, MK_UNI, 0, 0},
     {"Noise", "NOISE", 0, MK_UNI, 0, 0},
     {"Detune", "DETUNE", 0, MK_UNI, 0, 0},
+    {"Overdrive", "DRIVE", 30, MK_UNI, 0, 0},
+    {"FM Level", "FM LVL", 0, MK_UNI, 0, 0},
     {"Cutoff", "CUTOFF", 50, MK_UNI, 0, 0},
-    {"Resonance", "RESON", 70, MK_UNI, 0, 0},
-    {"Env Mod", "ENV MOD", 90, MK_BIP, 0, 0},
-    {"Filter Mode", "MODE", 0, MK_SW, 2, FMODE_NAME},
-    {"Accent", "ACCENT", 80, MK_UNI, 0, 0},
-    {"Key Track", "KEY TRACK", 30, MK_UNI, 0, 0},
-    {"Filter Attack", "ATTACK", 0, MK_UNI, 0, 0},
-    {"Filter Decay", "DECAY", 58, MK_UNI, 0, 0},
-    {"Filter Sustain", "SUSTAIN", 0, MK_UNI, 0, 0},
-    {"Filter Release", "RELEASE", 50, MK_UNI, 0, 0},
-    {"Amp Attack", "ATTACK", 0, MK_UNI, 0, 0},
-    {"Amp Decay", "DECAY", 72, MK_UNI, 0, 0},
-    {"Amp Sustain", "SUSTAIN", 90, MK_UNI, 0, 0},
-    {"Amp Release", "RELEASE", 30, MK_UNI, 0, 0},
-    {"Pitch Env Amount", "AMOUNT", 64, MK_BIP, 0, 0},
-    {"Pitch Env Decay", "DECAY", 40, MK_UNI, 0, 0},
-    {"Tune", "TUNE", 64, MK_BIP, 0, 0},
-    {"Slide Time", "SLIDE", 50, MK_UNI, 0, 0},
+    {"Resonance", "RESO", 70, MK_UNI, 0, 0},
+    {"VCF Decay", "DECAY", 60, MK_UNI, 0, 0},
+    {"VCF Env Depth", "DEPTH", 90, MK_UNI, 0, 0},
+    {"VCF Mode", "MODE", 0, MK_SW, 2, FMODE_NAME},
+    {"VCA Release", "RELEASE", 30, MK_UNI, 0, 0},
+    {"LFO Rate", "RATE", 60, MK_UNI, 0, 0},
+    {"LFO Level", "LFO LVL", 0, MK_UNI, 0, 0},
+    {"LFO Shape", "SHAPE", LS_TRI, MK_LIST, BA_NSHAPES, BA_SHAPE_NAME},
+    {"LFO Sync", "SYNC", 0, MK_SW, 2, LSYNC_NAME},
+    {"LFO Reset", "RESET", 0, MK_SW, 2, SW_ONOFF},
     {"Glide", "GLIDE", 0, MK_UNI, 0, 0},
-    {"VCA Level", "VCA LVL", 110, MK_UNI, 0, 0},
-    {"Legato", "LEGATO", 0, MK_SW, 2, SW_ONOFF},
-    {"Glide Mode", "GLIDE MODE", 0, MK_LIST, 2, GMODE_NAME},
-    {"Velocity > Cutoff", "VEL>CUT", 30, MK_UNI, 0, 0},
-    {"Velocity > VCA", "VEL>VCA", 60, MK_UNI, 0, 0},
-    {"High Pass Cutoff", "HP CUT", 0, MK_UNI, 0, 0},
-    {"High Pass Resonance", "HP RES", 20, MK_UNI, 0, 0},
-    {"FX1 Type", "TYPE", 2, MK_LIST, BA_NX1, BA_X1_NAME},
-    {"FX1 Gain", "GAIN", 40, MK_UNI, 0, 0},
-    {"FX1 Level", "LVL", 100, MK_UNI, 0, 0},
-    {"FX1 Mix", "MIX", 0, MK_UNI, 0, 0},
-    {"FX2 Type", "TYPE", 0, MK_LIST, BA_NX2, BA_X2_NAME},
-    {"FX2 Depth", "DEPTH", 60, MK_UNI, 0, 0},
-    {"FX2 Speed", "SPD", 30, MK_UNI, 0, 0},
-    {"FX2 Width", "WIDTH", 127, MK_UNI, 0, 0},
-    {"FX2 Feedback", "FEED", 64, MK_BIP, 0, 0},
-    {"FX2 Mix", "MIX", 0, MK_UNI, 0, 0},
-    {"FX3 Type", "TYPE", 1, MK_LIST, BA_NX3, BA_X3_NAME},
-    {"FX3 Parameter 1", "TIME", 60, MK_UNI, 0, 0},
-    {"FX3 Parameter 2", "TIME R", 64, MK_UNI, 0, 0},
-    {"FX3 Feedback", "FEED", 50, MK_UNI, 0, 0},
-    {"FX3 Damp", "DAMP", 64, MK_BIP, 0, 0},
-    {"FX3 Mix", "MIX", 0, MK_UNI, 0, 0},
-    {"FX3 Sync", "SYNC", 127, MK_SW, 2, SW_SYNC3},
-    MOD_PARAMS("1"), MOD_PARAMS("2"), MOD_PARAMS("3"),
-    {"Sequence Length", "LENG", 15, MK_LIST, BA_STEPS, 0},
-    {"Sequence Divisions", "DVS", 7, MK_LIST, BA_NDVS, DVS_NAME},
-    {"Sequence Probability", "PROB", 127, MK_UNI, 0, 0},
-    {"Sequence Swing", "SWING", 0, MK_UNI, 0, 0},
-    {"Drive", "DRIVE", 30, MK_UNI, 0, 0},
+    {"Last Step", "LAST", 15, MK_LIST, BA_STEPS, 0},
+    {"Play Mode", "PLAY", PM_FWD, MK_LIST, BA_NPMODES, BA_PMODE_NAME},
+    {"Shuffle", "SHUFFLE", 0, MK_UNI, 0, 0},
+    {"Scale", "SCALE", 4, MK_LIST, BA_NSCALES, BA_SCALE_NAME},
+    {"Root", "ROOT", 0, MK_LIST, 12, BA_NOTE_NAME},
+    {"Random Target", "TARGET", RT_PATTERN, MK_LIST, BA_NRTGT, BA_RTGT_NAME},
+    {"Random Amount", "AMOUNT", 40, MK_UNI, 0, 0},
+    {"Random Low", "LOW", 0, MK_UNI, 0, 0},
+    {"Random High", "HIGH", 64, MK_UNI, 0, 0},
+    {"Arp Direction", "DIR", AD_UP, MK_LIST, BA_NADIR, BA_ADIR_NAME},
+    {"Arp Octaves", "OCT", 0, MK_LIST, 3, AOCT_NAME},
+    {"Arp Gate", "GATE", 5, MK_LIST, 10, AGATE_NAME},
+    {"Arp Latch", "LATCH", 0, MK_SW, 2, SW_ONOFF},
 };
 
 /* ------------------------------------------------------------- Umrechnungen --- */
-float ba_cutoff_hz(int v) { return 20.0f * ba_exp2((float)v / 127.0f * 10.0f); }               /* 20 Hz .. 20 kHz */
-float ba_env_ms(int v, int attack)
-{
-    float n = (float)v / 127.0f;
-    return attack ? 1.0f * ba_exp2(n * 13.3f) : 2.0f * ba_exp2(n * 12.9f);   /* A 1 ms .. 10 s, D/R 2 ms .. 15 s */
-}
-float ba_lfo_hz(int v) { return 0.02f * ba_exp2((float)v / 127.0f * 11.3f); }                  /* 0.02 .. 50 Hz */
-float ba_glide_ms(int v) { return v ? 2.0f * ba_exp2((float)v / 127.0f * 10.0f) : 0.0f; }      /* bis 2 s */
-float ba_tune_semis(int v)                                /* ±12 Halbtöne, fein um die Mitte */
-{
-    float b = ((float)v - 64.0f) / 63.0f;
-    b = b < -1.0f ? -1.0f : b > 1.0f ? 1.0f : b;
-    return 12.0f * b * (b < 0.0f ? -b : b);
-}
-float ba_drive_db(int v) { return (float)v / 127.0f * 36.0f; }                                    /* 0 .. +36 dB */
+static float nrm(int v) { return (float)v * (1.0f / 127.0f); }
+
+float ba_cutoff_hz(int v) { return 20.0f * ba_exp2(nrm(v) * 10.0f); }                 /* 20 Hz .. 20 kHz */
+float ba_fdecay_ms(int v) { return 10.0f * ba_exp2(nrm(v) * 8.2f); }                   /* 10 ms .. 3 s */
+float ba_vrel_ms(int v) { return v >= 127 ? -1.0f : 5.0f * ba_exp2(nrm(v) * 9.6f); }   /* 5 ms .. 3.9 s, ganz: offen */
+float ba_lfo_hz(int v) { return 0.05f * ba_exp2(nrm(v) * 14.0f); }                     /* 0.05 Hz .. 800 Hz (Audio) */
+float ba_glide_ms(int v) { return v ? 5.0f * ba_exp2(nrm(v) * 8.6f) : 0.0f; }          /* bis 2 s */
+float ba_pe_decay_ms(int d) { return 4.0f * ba_exp2((float)(d < 1 ? 1 : d > 9 ? 9 : d) * 0.75f - 0.75f); } /* 4..256 ms */
+
 int ba_list_index(int id, int v)
 {
-    int n = BA_PARAMS[id].n;
-    int i;
+    int n = BA_PARAMS[id].n, i;
     if (n < 2)
         return 0;
     i = (v * (n - 1) + 63) / 127;
@@ -131,29 +96,39 @@ int ba_list_value(int id, int idx)
 }
 int ba_wave_index(int v) { return ba_list_index(P_WAVE, v); }
 
+int ba_scale_snap(const ba_patch *pt, int note)
+{
+    uint16_t m = BA_SCALE_MASK[ba_list_index(P_SCALE, pt->p[P_SCALE])];
+    int root = ba_list_index(P_ROOT, pt->p[P_ROOT]), d;
+    for (d = 0; d < 12; d++) {           /* abwärts zuerst, dann aufwärts */
+        int a = note - d, b = note + d;
+        if (m >> (((a - root) % 12 + 12) % 12) & 1u)
+            return a;
+        if (m >> (((b - root) % 12 + 12) % 12) & 1u)
+            return b;
+    }
+    return note;
+}
+
 void ba_patch_init(ba_patch *pt)
 {
-    int i, m;
+    int i;
     char *z = (char *)pt;
     for (i = 0; i < (int)sizeof *pt; i++)
         z[i] = 0;
-    for (i = 0; i < BA_NP; i++)           /* bei Listen steht im Standardwert der Eintrag */
-        pt->p[i] = BA_PARAMS[i].kind == MK_LIST ? (uint8_t)ba_list_value(i, BA_PARAMS[i].def) : BA_PARAMS[i].def;
-    for (m = 0; m < 3; m++) {
-        for (i = 0; i < BA_NDEST; i++)
-            pt->lvl[m][i] = 64;
-        for (i = 0; i < BA_MSTEPS; i++)
-            pt->mstep[m][i] = 64;
-    }
+    for (i = 0; i < BA_NP; i++)           /* bei Listen und Schaltern steht im Standardwert der Eintrag */
+        pt->p[i] = BA_PARAMS[i].kind == MK_LIST || BA_PARAMS[i].kind == MK_SW
+                       ? (uint8_t)(BA_PARAMS[i].kind == MK_SW ? (BA_PARAMS[i].def ? 127 : 0) : ba_list_value(i, BA_PARAMS[i].def))
+                       : BA_PARAMS[i].def;
     for (i = 0; i < BA_STEPS; i++) {
-        pt->seq[i].note = 48;
-        pt->seq[i].gate = 64;
-        pt->seq[i].fl = 0;
+        pt->seq[i].note = 36;
+        pt->seq[i].gate = 5;
+        pt->seq[i].mod = 64;
+        pt->seq[i].pe = 5;               /* Decay 5, Depth 0 (aus) */
     }
     pt->bpm = 120;
-    {
-        const char *n = "INIT";
-        for (i = 0; n[i]; i++)
-            pt->name[i] = n[i];
-    }
+    pt->name[0] = 'I';
+    pt->name[1] = 'N';
+    pt->name[2] = 'I';
+    pt->name[3] = 'T';
 }

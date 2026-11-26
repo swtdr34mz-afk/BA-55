@@ -11,7 +11,7 @@
 #define APP_SPLASH                       /* app_splash: der eigene Startbildschirm */
 #define APP_BLOCK 128u                   /* Frames pro Audioblock: 2.9 ms bei 44.1 kHz (eine Tastatur: wenig Latenz) */
 #define APP_TOUCH                        /* Anschlagdynamik von den Tasten (lib/touch.h) */
-#define APP_CANVAS_PX (240u * 110u)      /* der Bildschirm in Streifen bis 110 Zeilen (das Delay braucht den Pool) */
+#define APP_CANVAS_PX (240u * 110u)      /* der Bildschirm in Streifen bis 110 Zeilen (der Rest des RAM bleibt frei) */
 
 /* der Speicher: die Einstellungen (mit dem Klang in Arbeit), die Panel-Kalibrierung (die der Plattform), und die
  * 16 Preset-Plätze in zwei Bänken zu je 8 */

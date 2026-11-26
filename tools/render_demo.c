@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: MPL-2.0
  * Copyright (C) 2026 swtdr34mz (BA-55) */
-/* BA-55 – Offline-Renderer am PC: jedes Preset als WAV (mit seiner Sequenz, oder gespielte Noten), dazu Pegel und
+/* BA-55 – Offline-Renderer am PC: jedes Preset als WAV (mit seinem Pattern), dazu Pegel und
  * Rechenzeit. cc -O2 -Idsp dsp/ba55_core.c tools/render_demo.c -lm -o render_demo && ./render_demo out/ */
 #include "ba55_core.h"
 #include <math.h>
@@ -34,8 +34,6 @@ static void write_wav(const char *path, const float *d, int frames)
     fclose(f);
 }
 
-static int16_t DL[BA_DLY_FRAMES], DR[BA_DLY_FRAMES];
-static float CHO[BA_CHO_FRAMES], REV[BA_REV_FLOATS], WIDE[BA_WIDE_FRAMES];
 static ba_engine E;
 static ba_patch P;
 
@@ -52,7 +50,6 @@ int main(int argc, char **argv)
         char path[512];
         ba_preset(&P, pr);
         ba_init(&E, SR, &P);
-        ba_fx_memory(&E, DL, DR, CHO, REV, WIDE);
         /* der Sequencer läuft mit dem Pattern des Presets */
         if (0) {   /* (alle BA-55-Presets haben ein Pattern: der Sequencer läuft) */
             static const int NOTES[3] = {48, 55, 60};

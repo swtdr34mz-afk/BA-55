@@ -1,105 +1,94 @@
 # BA-55
 
-A bassline for the M-VAVE FM-1 by **swtdr34mz**, in the spirit of the Erica Synths Bassline DB-01.
-On the screen, the look of its panel: matte black aluminium, white legends and thin white lines around the sections,
-black Moog-style knobs over a printed scale, the red 7-segment display (it shows the note that sounds), and the row of
-16 step buttons whose LEDs glow pink-red. The curves (the output, the filter, the envelopes, the pattern) light up
-in a red LED dot matrix. It opens with the step LEDs running through, as the DB-01 does when it starts.
-Built on [fm1-base](https://github.com/charlesvestal/fm1-base) and [felucca-bsp](https://github.com/hugelton/felucca-bsp);
-the sound core grew out of [MONSUN](https://github.com/swtdr34mz-afk/MONSUN).
+A bassline for the M-VAVE FM-1 by **swtdr34mz**, after the Erica Synths Bassline DB-01, and with only what the DB-01
+itself has: no extra effects, no extra modulators.
 
-![BA-55](site/img/screen-main.png) ![The filter](site/img/screen-filter.png) ![The sequencer](site/img/screen-seq.png) ![FX](site/img/screen-fx.png)
+On the screen, the look of its panel: matte black, sandblasted aluminium in a soft light from the top left; white
+silkscreen with wide letter spacing and hairline white frames with round corners around the sections; black
+Moog-style knobs (a finely knurled skirt with a bevel, a flat cap with a soft sheen, a white line) over a printed
+scale, their value as red LED dots; the red 7-segment display behind smoked glass, which shows the note that sounds
+and, while a knob turns, its value; and the row of 16 rubber step keys whose LEDs glow pink-red and throw light onto
+the panel. The curves (the output, the filter, the envelopes, the LFO, the pattern, the mod track, the scale) light up
+in an LED dot matrix behind a red diffuser. It opens as the DB-01 does: every segment lit, a running light across the
+keys, then **bASS**.
 
-## The voice
+Built on [fm1-base](https://github.com/charlesvestal/fm1-base) and [felucca-bsp](https://github.com/hugelton/felucca-bsp).
 
-One **VCO**, switched between TRI, SAW and SQR (the square's width can be modulated), a **SUB** oscillator an octave
-down (a square, as from a transistor divider) and **NOISE**. **DETUNE** adds a copy of the VCO that drifts like a
-signal through a bucket-brigade delay, up to about 40 cents, and widens the image: from a slight thickening to a swarm.
+![BA-55](site/img/screen-main.png) ![The steps](site/img/screen-seq.png) ![The mod track](site/img/screen-mod.png) ![The pattern](site/img/screen-pattern.png)
 
-The filter is a 12 dB **state-variable filter in the spirit of the Polivoks / the Erica Acidbox**: its two integrators
-saturate, so at high resonance it tips into a raw, stable whistle instead of blowing up. **MODE** switches between
-low-pass and **band-pass**. CUTOFF, RESON, ENV MOD (bipolar) and the filter's DECAY sit together, as on the DB-01.
+## The sound
 
-**DRIVE** (on ALGORITHM) is the one-knob overdrive after the filter: from warmth to tearing, slightly asymmetric.
-
-Three envelopes: the **VCA** and the **filter** as ADSRs (set to decays for the classic sound), and a **PITCH**
-envelope (AMOUNT ±36 semitones, DECAY): a short zap, or a kick drum from the triangle.
-
-**ACCENT** works like the 303's: an accented step is louder, its filter opens further with its own short push, and the
-resonance bites a little more. **SLIDE** glides into the next step without a new attack (SLIDE time 8 to 400 ms).
-
-If the FM-1 runs short of time (the load over 88 % for a second), BA-55 drops the oversampling by itself and shows
-**ECO**.
-
-## The modulators
-
-Three, M1 to M3: each has one source, and its own level to each of 13 destinations at once
-(CV, SUB, NOI, PW, CUT, VCA, DRV, DET, FX2, FX3, RES, EGL, HPF). A fast LFO on CV is the DB-01's FM.
-
-| Mode | K2 | K3 | K4 |
-| --- | --- | --- | --- |
-| LFO | RATE | WAVE: TRI, SQUARE, PULSE 25, TRAPEZ, CHAOS SAW | FADE |
-| ENV | A | D/R | S |
-| RANDOM | RATE | LAG | PROB |
-| STEP | # (1..16 steps) | STEP | ->LVL |
-
-Their second page: **DEST**, **LVL**, **SYNC** (FREE, KEY, BPM, BPM KEY).
-
-## The effects
-
-A 2-pole **high-pass**, then **FX1** (HARD CLIP, FOLDBACK, S-CURVE, TRI CLIP, SHRED, BIT CRUSH), **FX2** (CHORUS,
-ENSEMBLE, FLANGER) and **FX3** (DELAY, PING PONG, LARGE REV, SOFT REV), free or in tempo.
+- **VCO**: WAVE (triangle, saw, square), **SUB** (a square an octave down, as from a transistor divider), **NOISE**
+  into the filter (with the triangle on a low note and noise fully up: hi-hats, as the DB-01's manual suggests).
+- **DETUNE** blends in a copy shifted through a bucket-brigade line. Turned further, its inner LFO runs faster;
+  fully up it becomes FM madness.
+- **OVERDRIVE** is a blend from the clean sound to the overdrive stage (also on ALGORITHM).
+- **FM LVL**: how far the LFO moves the VCO's pitch (far off pitch when high; the LFO reaches audio rate).
+- **VCF**: CUTOFF, RESO (fully up it self-oscillates), the envelope's **DECAY** and **DEPTH**, and **MODE** low-pass /
+  band-pass. A 12 dB state-variable filter whose two integrators saturate, in the spirit of the Polivoks / Acidbox.
+- **VCA**: **RELEASE** of a sustain-release envelope that follows the gate. Fully up the VCA stays open: a drone synth.
+- **LFO**: RATE (0.05 Hz to audio rate, or in tempo with SYNC), **LFO LVL** to the cutoff, SHAPE (sine, triangle, saw,
+  ramp, square, triple decay saw, saw + triangle, triple ramp, S&H, noise), RESET on every gate.
+- **ACCENT** (per step) opens the VCA and the VCF a little. **SLIDE** (per step) glides into the next note, with the
+  fixed time of the instrument. **GLIDE** for playing keys and MIDI. **TUNE** 430 to 450 Hz in the settings.
 
 ## The sequencer
 
-**64 steps**, each with a **NOTE**, a **GATE** (far left REST, far right TIE) and **ACC/SLIDE** (-, ACCENT, SLIDE,
-both); for the whole pattern **LENG** (1..64), **DVS** (steps per bar), **PROB** and **SWING**. The bottom of the
-screen always shows the 16 step buttons of the page that is playing: a dim LED is a note, a brighter one an accent,
-a line to the next button a slide, and the running step glows. While it runs, the keys transpose it (C3 plays it as
-it is).
+**64 steps** in four bars of 16. Per step: **NOTE**, **GATE** 10 to 100 % (100 %: tied to the next step, no new
+attack; turned fully down the step is off), **ACC/SLD**, **MOD** (an offset to the cutoff), **PITCH ENV** (DEPTH and
+DECAY 1 to 9, OFF), **PROB** (100, 75, 50, 25 %, or 1/2, 1/3, 1/4: only every 2nd, 3rd, 4th time round).
+For the pattern: **LAST** step, **PLAY** mode (FWD, BWD, RND, PP, PP2: ping-pong with the ends played twice),
+**SHUFFLE** and **TEMPO**. The keys transpose a running pattern (C3 plays it as it is).
 
-**RECORD**: on a SEQ page press REC, then play: each key writes the selected step and moves on (a hard hit writes an
-ACCENT); past the end the pattern grows, up to 64. **ARP** on SEQUENCER copies a step and pastes it on the next
-press. **ARP on SEQ SETUP makes a random pattern**, as the DB-01's generator does: notes from a minor pentatonic
-around the first step's root, octave jumps, rests, accents and slides over the pattern's length.
+- **The mod track live**, as on the DB-01: hold **REC** and turn **SELECT** (the cutoff) while the pattern runs; the
+  steps take the movement.
+- **Notes in**: on a STEP page press REC, then play: each key writes the selected step and moves on; past the last
+  step the pattern grows. OCT- / OCT+ on a STEP page move the selected step an octave.
+- **RND PATT**: TARGET (PATTERN, NOTES, GATES, ACCENT, SLIDE, MOD, PITCH ENV, PROB, STEP ON), AMOUNT, LOW and HIGH
+  (the limits: notes 0 to 24 semitones over the root, gates, mod, pitch envelope depth). **REC** on that page makes
+  the new pattern. Notes come from the **SCALE**: chromatic, major, minor, major and minor pentatonic, whole tone,
+  major and minor blues, on any **ROOT**.
+- **The arpeggiator**: ARP switches it on; held keys play in 16ths, DIR (UP, DOWN, UP&DOWN, RANDOM), OCT 1 to 3,
+  GATE 10 to 100 %, LATCH.
+- **Copy and paste**: ARP on a STEP page copies the step, and pastes it on the next press.
 
 BA-55 follows **MIDI clock and START / STOP / CONTINUE** over USB; MIDI notes play it (and transpose a running
-pattern), pitch bend bends it.
+pattern), pitch bend bends it. Velocity is not used, as on the DB-01: accents come from the pattern.
 
 ## Pages
 
 | Button | Page | K1 | K2 | K3 | K4 |
 | --- | --- | --- | --- | --- | --- |
 | HOME | **VCO** | WAVE | SUB | NOISE | DETUNE |
-| SEL | **VCF** | CUTOFF | RESON | ENV MOD | DECAY |
-| SEL again | **VCF 2** | MODE (LP / BP) | ACCENT | KEY TRACK | HP CUT |
-| ENV | **VCA ENV** (again: **VCF ENV**) | ATTACK | DECAY | SUSTAIN | RELEASE |
-| ENV a third time | **PITCH ENV** | AMOUNT | DECAY | TUNE | SLIDE |
-| LFO | **M1**, **M1 DEST**, **M2**, **M2 DEST**, **M3**, **M3 DEST** | MODE / DEST | (by mode) / LVL | (by mode) / SYNC | (by mode) |
-| EDIT | **SET** | GLIDE | GLIDE MODE | LEGATO | VCA LVL |
-| EDIT again | **SET 2** | VEL>CUT | VEL>VCA | HP RES | DRIVE |
-| FX | **FX1**, **FX2**, **FX3**, **FX MORE** | TYPE | | | MIX |
-| GLO | **GLOBAL** | TEMPO | DLY SYNC | | |
-| GLO again | **SETTINGS** | BEND (semitones) | MIDI CH | VELOCITY (on / fixed) | |
-| SEQ | **SEQUENCER** | STEP | NOTE | GATE | ACC/SLIDE |
-| SEQ again | **SEQ SETUP** | LENG | DVS | PROB | SWING |
+| SEL | **VCF** | CUTOFF | RESO | MODE | DRIVE |
+| ENV | **ENV** | DECAY | DEPTH | RELEASE | GLIDE |
+| LFO | **LFO** | RATE | FM LVL | LFO LVL | SHAPE |
+| LFO again | **LFO** | SYNC | RESET | | |
+| SEQ | **STEP** | STEP | NOTE | GATE | ACC/SLD |
+| SEQ again | **STEP MOD** | STEP | MOD | PROB | |
+| SEQ a third time | **STEP PITCH ENV** | STEP | DEPTH | DECAY | |
+| GLO | **PATTERN** | LAST | PLAY | SHUFFLE | TEMPO |
+| GLO again | **SETTINGS** | TUNE | MIDI CH | BEND | |
+| EDIT | **RND PATT** | TARGET | AMOUNT | LOW | HIGH |
+| EDIT again | **SCALE** | SCALE | ROOT | | |
+| FX | **ARPEGGIATOR** | DIR | OCT | GATE | LATCH |
 
 ## Controls
 
 | Control | What it does |
 | --- | --- |
-| SELECT | CUTOFF, on every page |
-| ALGORITHM | DRIVE |
-| PRESET | The 16 preset slots |
-| SAVE | Save: PRESET picks the slot, SAVE again saves (any other button cancels) |
-| REC held 1 s | The slot's factory preset back (save it to keep it) |
-| ARP | HOLD; on SEQUENCER copy / paste a step; on SEQ SETUP a random pattern |
-| OCT- / OCT+ | The keys' octave |
-| PLAY | The sequencer: start / stop |
+| SELECT | CUTOFF; with REC held while the pattern runs: the mod track |
+| ALGORITHM | OVERDRIVE |
+| PRESET | The 16 slots (a sound with its pattern) |
+| SAVE | Save: PRESET picks the slot, SAVE again saves |
+| REC | STEP pages: notes in; RND PATT: a new pattern; elsewhere held 1 s: the slot's factory preset |
+| ARP | The arpeggiator on / off; on STEP pages copy / paste a step |
+| OCT- / OCT+ | The keys' octave; on STEP pages the step's octave |
+| PLAY | Start / stop |
 
-Presets: BA-55, ACIDLIN, SQRACID, SUBDROP, BPZAP, DIRTY, ROLLER, DETROIT, SWARM, PSYROLL, BOOMKCK, NOIZHAT, WOBBLER,
-FMGRIT, RANDOM, DRONE01. Each comes with its own pattern. The sound you are working on saves itself once the
-sequencer stops; the slots only with SAVE.
+Presets: BA-55, ACIDLIN, SQRACID, DRONE, BPZAP, DIRTY, ROLLER, SWARM, PSYROLL, BOOMKCK, NOIZHAT, FMGRIT, WOBBLER,
+MODTRAK, RANDOM, PROBPAT, each with its pattern. The sound you are working on saves itself once the pattern stops;
+the slots only with SAVE.
 
 ## The sound core
 

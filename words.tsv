@@ -9,23 +9,18 @@ VCA	V C A
 ENV	envelope
 LP	low pass
 BP	band pass
-HP	high pass
-DVS	divisions
-LENG	length
-CV	pitch
 SUB	sub
-NOI	noise
-PW	pulse width
-CUT	cutoff
-DRV	drive
-DET	detune
-RES	resonance
-EGL	envelope amount
-HPF	high pass
 ST	semitones
 ACC	accent
-SLD	slide
-ACC/SLIDE	accent and slide
-ACC+SLD	accent and slide
 SQR	square
 TRI	triangle
+RESO	resonance
+FM LVL	F M level
+LFO LVL	L F O level
+RND PATT	random pattern
+PP	ping pong
+PP2	ping pong two
+FWD	forward
+BWD	backward
+RND	random
+ACC/SLD	accent and slide

@@ -1,18 +1,14 @@
-# the knobs' speed: HOME fast, SEL and ENV a little faster, the rest fine
+# the knobs' speed: VCO, VCF and ENV fast, the rest fine
 wait 2600
 expect p1 30
 turn K2 6
 wait 30
-expect p1 60
+expect p1 48
 tap SEL
 turn K2 4
 wait 30
-expect p5 108
-tap ENV
-turn K2 4
+expect p7 110
+tap LFO
+turn K1 4
 wait 30
-expect p15 84
-tap FX
-turn K2 4
-wait 30
-expect p31 44
+expect p12 64

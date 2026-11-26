@@ -7,7 +7,5 @@
 
 #include "ba55_params.c"
 #include "ba55_voice.c"
-#include "ba55_mod.c"
-#include "ba55_fx.c"
 #include "ba55_seq.c"
 #include "ba55_presets.c"
