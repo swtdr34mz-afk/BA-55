@@ -39,63 +39,65 @@ float ba_band_level(const ba_engine *e, int b) { return b >= 0 && b < BA_NBANDS 
 float ba_band_gain(const ba_engine *e, int b) { return b >= 0 && b < BA_NBANDS ? e->fb_g[b] : 0.0f; }
 float ba_reverb_level(const ba_engine *e) { return ba_clamp(e->rv_lvl, 0.0f, 1.0f); }
 
-/* die Pegel der Bänder für dieses Stück, mit der Modulation */
+/* das gewählte Effekt-Preset, und was AMOUNT (wie stark) und MOTION (wie bewegt) daraus machen */
+static const ba_fxpreset *fx_pre(const ba_engine *e) { return &BA_FXPRESET[ba_list_index(P_FX, e->pt->p[P_FX])]; }
+static float fx_amount(const ba_engine *e) { return nrm(e->pt->p[P_FXAMT]); }
+static float fx_motion(const ba_engine *e) { return nrm(e->pt->p[P_FXMOT]); }
+
+/* die Pegel der Bänder für dieses Stück, mit der Bewegung */
 static void fb_gains(ba_engine *e, int n, float in_env)
 {
-    const uint8_t *p = e->pt->p;
-    int mode = ba_list_index(P_FBMOD, p[P_FBMOD]), b;
-    float depth = nrm(p[P_FBDEPTH]), rate = nrm(p[P_FBRATE]);
-    float pos = 0.0f;
-    if (mode == FM_LFO) {                /* eine Welle läuft durch die Bänder: 0.05 .. 12 Hz */
-        e->fb_ph += 0.05f * ba_exp2(rate * 7.9f) * (float)n / e->sr;
+    const ba_fxpreset *fp = fx_pre(e);
+    int mode = fp->mod, b;
+    float m = fx_motion(e), depth = m * (float)fp->depth * 0.01f, pos = 0.0f;
+    if (m < 0.01f)
+        mode = FM_OFF;                   /* MOTION ganz links: der Effekt steht still */
+    if (mode == FM_LFO) {                /* eine Welle läuft durch die Bänder: mit MOTION von 0.1 bis 10 Hz */
+        e->fb_ph += 0.1f * ba_exp2(m * 6.6f) * (float)n / e->sr;
         e->fb_ph -= (float)(int)e->fb_ph;
-    } else if (mode == FM_CLOCK) {       /* ein Lichtpunkt springt im Takt von Band zu Band: 1 Takt .. 1/32 pro Band */
+    } else if (mode == FM_CLOCK) {       /* ein Lichtpunkt springt im Takt: mit MOTION von 1 Takt bis 1/32 pro Band */
         static const float DIV[6] = {4.0f, 2.0f, 1.0f, 0.5f, 0.25f, 0.125f};
-        float beats = DIV[(int)(rate * 5.0f + 0.5f)];
+        float beats = DIV[(int)(m * 5.0f + 0.5f)];
         e->fb_ph += ba_bpm(e) / 60.0f / beats * (float)n / e->sr;
         if (e->fb_ph >= (float)BA_NBANDS)
             e->fb_ph -= (float)BA_NBANDS;
-        if (!e->running && e->fb_ph < 0.0f)
-            e->fb_ph = 0.0f;
-    } else if (mode == FM_ENV) {         /* der Hüllkurvenfolger: laut öffnet die Bänder von unten nach oben */
-        float rel = ba_expf(-(float)n / ((0.02f + 0.6f * (1.0f - rate)) * e->sr));
+    } else if (mode == FM_ENV) {         /* der Hüllkurvenfolger: laut öffnet die Bänder; MOTION: schneller zurück */
+        float rel = ba_expf(-(float)n / ((0.03f + 0.5f * (1.0f - m)) * e->sr));
         e->fb_env = in_env > e->fb_env ? e->fb_env + (in_env - e->fb_env) * 0.5f : e->fb_env * rel + in_env * (1.0f - rel);
         pos = ba_clamp(e->fb_env * 3.0f, 0.0f, 1.0f) * (float)BA_NBANDS;
     }
     for (b = 0; b < BA_NBANDS; b++) {
-        float v = nrm(p[P_FB1 + b]), g = v * v * 2.0f, m = 1.0f;   /* 90 = 0 dB, 127 = +6 dB, 0 = zu */
+        float v = (float)fp->band[b] / 127.0f, g = v * v * 2.0f, k = 1.0f;
         switch (mode) {
         case FM_LFO: {
             float w = e->fb_ph + (float)b * 0.1f, tri;
             w -= (float)(int)w;
-            tri = 1.0f - 2.0f * ba_abs(w - 0.5f) * 2.0f;  /* -1..1 */
+            tri = 1.0f - 4.0f * ba_abs(w - 0.5f);
             tri = tri * (1.5f - 0.5f * tri * tri);
-            m = 1.0f - depth * (0.5f - 0.5f * tri);
+            k = 1.0f - depth * (0.5f - 0.5f * tri);
             break;
         }
-        case FM_CLOCK: {
-            int cur = (int)e->fb_ph;
-            m = b == cur ? 1.0f + depth * 0.6f : 1.0f - depth * 0.9f;
-            break;
-        }
-        case FM_ENV: m = 1.0f - depth * ba_clamp((float)b + 1.0f - pos, 0.0f, 1.0f); break;
+        case FM_CLOCK: k = b == (int)e->fb_ph ? 1.0f + depth * 0.6f : 1.0f - depth * 0.9f; break;
+        case FM_ENV: k = 1.0f - depth * ba_clamp((float)b + 1.0f - pos, 0.0f, 1.0f); break;
         default: break;
         }
-        e->fb_g[b] = g * m;
+        e->fb_g[b] = g * k;
     }
 }
 
 static void fx_render(ba_engine *e, const float *in, float *l, float *r, int n)
 {
-    const uint8_t *p = e->pt->p;
-    float fmix = nrm(p[P_FBMIX]), rmix = nrm(p[P_RVMIX]);
+    const ba_fxpreset *fp = fx_pre(e);
+    float amt = fx_amount(e), fmix = ba_clamp(amt * 1.6f, 0.0f, 1.0f) * (float)fp->mix * 0.01f;
+    float rmix = nrm(e->pt->p[P_RVMIX]);
     int i;
     for (i = 0; i < n; i++)
         l[i] = r[i] = in[i];
     /* ---- die Filterbank ---- */
     if (fmix > 0.002f) {
-        float drv = nrm(p[P_FBDRIVE]), gin = 1.0f + drv * drv * 15.0f;   /* bis +24 dB */
-        float k = bipn(p[P_FBRESO]), spr = nrm(p[P_FBSPREAD]) * 0.9f, gg[BA_NBANDS], rr[BA_NBANDS], pan[BA_NBANDS];
+        float drv = amt * (float)fp->drive * 0.01f, gin = 1.0f + drv * drv * 15.0f;   /* bis +24 dB */
+        float k = (float)fp->reso * 0.01f * (0.3f + 0.7f * amt), spr = (float)fp->spread * 0.009f;
+        float gg[BA_NBANDS], rr[BA_NBANDS], pan[BA_NBANDS];
         float env = 0.0f, lv[BA_NBANDS];
         int b;
         k = k * ba_abs(k) * 0.985f;      /* fein um die Mitte, ganz außen fast endlos */
@@ -144,9 +146,9 @@ static void fx_render(ba_engine *e, const float *in, float *l, float *r, int n)
     }
     /* ---- der Reverb ---- */
     if (e->rv && rmix > 0.002f) {
-        float size = 0.45f + 0.55f * nrm(p[P_RVSIZE]), fb = 0.70f + 0.285f * nrm(p[P_RVDECAY]);
-        float damp = 0.62f - 0.57f * nrm(p[P_RVTONE]), pk = 0.0f;
-        int len[12], c, pre = (int)((0.004f + 0.036f * nrm(p[P_RVSIZE])) * e->sr);
+        float sz = (float)fp->rv_size * 0.01f, size = 0.45f + 0.55f * sz, fb = 0.70f + 0.285f * (float)fp->rv_decay * 0.01f;
+        float damp = 0.62f - 0.57f * (float)fp->rv_tone * 0.01f, pk = 0.0f;
+        int len[12], c, pre = (int)((0.004f + 0.036f * sz) * e->sr);
         if (pre >= RV_PRE_MAX)
             pre = RV_PRE_MAX - 1;
         for (c = 0; c < 12; c++)

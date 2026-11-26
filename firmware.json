@@ -4,8 +4,8 @@
   "name": "BA-55",
   "author": "swtdr34mz",
   "license": "MPL-2.0",
-  "tagline": "A bassline after the Erica Synths DB-01: one VCO, sub, noise, BBD detune, a Polivoks-style filter, its 64-step sequencer, plus GROOVE, a resonant filterbank and a reverb",
-  "description": "A monophonic bassline after the Erica Synths Bassline DB-01: one VCO (triangle, saw, square), sub, noise, BBD detune, overdrive, FM from the LFO, a saturating 12 dB Polivoks-style LP/BP filter, a sustain-release VCA (fully up: a drone), an LFO with 10 shapes. The DB-01 sequencer: 64 steps with accent, slide, mod track, pitch envelope and probability per step, play modes, random patterns, scales, arpeggiator. Plus GROOVE (drums, pumping sidechain), a 10-band resonant filterbank and a reverb. 16 presets, MIDI clock in. Unofficial.",
+  "tagline": "A bassline after the Erica Synths DB-01: one VCO, sub, noise, BBD detune, a Polivoks-style filter, its 64-step sequencer, plus GROOVE, 12 filterbank effects and a reverb",
+  "description": "A monophonic bassline after the Erica Synths Bassline DB-01: one VCO (triangle, saw, square), sub, noise, BBD detune, overdrive, FM from the LFO, a saturating 12 dB Polivoks-style LP/BP filter, a sustain-release VCA (fully up: a drone), an LFO with 10 shapes. The DB-01 sequencer: 64 steps with accent, slide, mod track, pitch envelope and probability per step, play modes, random patterns, scales, arpeggiator. Plus GROOVE (drums, pumping sidechain), 12 one-knob effects on a 10-band resonant filterbank, and a reverb. 16 presets, MIDI clock in. Unofficial.",
   "tags": [
     "synth"
   ],

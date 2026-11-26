@@ -49,7 +49,7 @@ static const uint8_t FL_SQR[16] = {A, 0, 0, AS, 0, A, 0, 0, S, 0, 0, A, 0, AS, 0
 static const pv_t PV_DRONE[] = {{P_WAVE, 64}, {P_SUB, 90}, {P_DETUNE, 60}, {P_CUTOFF, 52}, {P_RESON, 92},
                                 {P_FDECAY, 100}, {P_FDEPTH, 40}, {P_VREL, 127}, {P_LRATE, 24}, {P_LFOLVL, 60},
                                 {P_LSHAPE, 0}, {P_DRIVE, 50},
-    {P_RVMIX, 60}, {P_RVSIZE, 120}, {P_RVDECAY, 110}, {P_RVTONE, 50}};
+    {P_FX, 69}, {P_FXAMT, 60}, {P_FXMOT, 40}, {P_RVMIX, 60}};
 static const uint8_t NT_DRONE[16] = {28, 0, 0, 0, 0, 0, 0, 0, 31, 0, 0, 0, 0, 0, 0, 0};
 static const uint8_t GT_DRONE[16] = {10, 0, 0, 0, 0, 0, 0, 0, 10, 0, 0, 0, 0, 0, 0, 0};
 static const uint8_t FL_DRONE[16] = {S, 0, 0, 0, 0, 0, 0, 0, S, 0, 0, 0, 0, 0, 0, 0};
@@ -57,7 +57,7 @@ static const uint8_t FL_DRONE[16] = {S, 0, 0, 0, 0, 0, 0, 0, S, 0, 0, 0, 0, 0, 0
 /* 5 BPZAP: der Bandpass, eine Pitch-Hüllkurve auf jedem Accent */
 static const pv_t PV_ZAP[] = {{P_WAVE, 64}, {P_FMODE, 127}, {P_CUTOFF, 58}, {P_RESON, 104}, {P_FDECAY, 48},
                               {P_FDEPTH, 90}, {P_DRIVE, 50}, {P_VREL, 20},
-    {P_FBMIX, 100}, {P_FBSHAPE, 81}, {P_FBRESO, 108}, {P_FBMOD, 85}, {P_FBRATE, 102}, {P_FBDEPTH, 90}, {P_FB1 + 0, 40}, {P_FB1 + 1, 70}, {P_FB1 + 2, 90}, {P_FB1 + 3, 110}, {P_FB1 + 4, 124}, {P_FB1 + 5, 124}, {P_FB1 + 6, 60}, {P_FB1 + 7, 30}, {P_FB1 + 8, 20}, {P_FB1 + 9, 10}, {P_RVMIX, 25}};
+    {P_FX, 35}, {P_FXAMT, 85}, {P_FXMOT, 60}, {P_RVMIX, 25}};
 static const uint8_t NT_ZAP[16] = {40, 0, 40, 52, 0, 40, 0, 47, 40, 0, 52, 40, 0, 45, 40, 0};
 static const uint8_t FL_ZAP[16] = {A, 0, 0, A, 0, 0, 0, A, 0, 0, A, 0, 0, A, 0, 0};
 static const uint8_t PE_ZAP[16] = {PE(6, 3), 0, 0, PE(8, 2), 0, 0, 0, PE(5, 4), 0, 0, PE(9, 2), 0, 0, PE(7, 3), 0, 0};
@@ -78,7 +78,7 @@ static const uint8_t FL_ROLL[16] = {0, 0, A, 0, 0, 0, 0, 0, 0, 0, A, 0, 0, 0, 0,
 /* 8 SWARM: DETUNE weit auf, der Schwarm */
 static const pv_t PV_SWARM[] = {{P_WAVE, 64}, {P_DETUNE, 70}, {P_SUB, 60}, {P_CUTOFF, 54}, {P_RESON, 70},
                                 {P_FDECAY, 80}, {P_FDEPTH, 84}, {P_VREL, 64},
-    {P_RVMIX, 40}, {P_RVSIZE, 90}, {P_RVDECAY, 80}};
+    {P_FX, 92}, {P_FXAMT, 40}, {P_FXMOT, 50}, {P_RVMIX, 40}};
 static const uint8_t NT_SWARM[16] = {33, 0, 0, 33, 0, 0, 40, 0, 38, 0, 0, 36, 0, 0, 31, 0};
 static const uint8_t GT_SWARM[16] = {10, 0, 0, 8, 0, 0, 10, 0, 10, 0, 0, 8, 0, 0, 7, 0};
 static const uint8_t FL_SWARM[16] = {0, 0, 0, S, 0, 0, 0, 0, 0, 0, 0, S, 0, 0, 0, 0};
@@ -109,7 +109,7 @@ static const uint8_t FL_HAT[16] = {0, 0, A, 0, 0, 0, A, 0, 0, 0, A, 0, 0, 0, A, 
 static const pv_t PV_FM[] = {{P_WAVE, 127}, {P_SUB, 50}, {P_CUTOFF, 52}, {P_RESON, 80}, {P_FDECAY, 60},
                              {P_FDEPTH, 96}, {P_DRIVE, 90}, {P_VREL, 28}, {P_FMLVL, 46}, {P_LRATE, 104},
                              {P_LSHAPE, 14},
-    {P_FBMIX, 90}, {P_FBSHAPE, 58}, {P_FBRESO, 100}, {P_FBDRIVE, 60}, {P_FBMOD, 42}, {P_FBRATE, 40}, {P_FBDEPTH, 70}, {P_FB1 + 0, 120}, {P_FB1 + 1, 0}, {P_FB1 + 2, 120}, {P_FB1 + 3, 0}, {P_FB1 + 4, 120}, {P_FB1 + 5, 0}, {P_FB1 + 6, 120}, {P_FB1 + 7, 0}, {P_FB1 + 8, 120}, {P_FB1 + 9, 0}};
+    {P_FX, 115}, {P_FXAMT, 75}, {P_FXMOT, 70}};
 static const uint8_t NT_FM[16] = {36, 0, 36, 36, 0, 39, 36, 0, 36, 0, 43, 36, 0, 41, 36, 34};
 static const uint8_t FL_FM[16] = {A, 0, 0, S, 0, A, 0, 0, A, 0, AS, 0, 0, A, 0, 0};
 

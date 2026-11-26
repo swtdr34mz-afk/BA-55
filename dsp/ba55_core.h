@@ -41,10 +41,9 @@ enum {
     P_RTGT, P_RAMT, P_RLO, P_RHI,
     /* der Arpeggiator */
     P_ADIR, P_AOCT, P_AGATE, P_ALATCH,
-    /* FX: die Filterbank (nach der Erica Synths Resonant Filterbank) und ein Reverb */
-    P_FBSHAPE, P_FBRESO, P_FBDRIVE, P_FBMIX, P_FBSPREAD, P_FBMOD, P_FBRATE, P_FBDEPTH,
-    P_FB1, P_FB10 = P_FB1 + 9,
-    P_RVSIZE, P_RVDECAY, P_RVTONE, P_RVMIX,
+    /* FX: ein Effekt-Preset (Filterbank nach der Erica Synths Resonant Filterbank, Bewegung, Raum), wie stark,
+     * wie bewegt, und der Hall */
+    P_FX, P_FXAMT, P_FXMOT, P_RVMIX,
     BA_NP
 };
 
@@ -81,11 +80,19 @@ extern const float BA_SYNC_BEATS[BA_NSYNC];
 /* FX: die zehn Bänder der Filterbank (fest, wie am Original), ihre Formen, die Modulation */
 #define BA_NBANDS 10
 extern const float BA_BAND_HZ[BA_NBANDS];
-#define BA_NFBSHAPES 12
-extern const char *const BA_FBSHAPE_NAME[BA_NFBSHAPES];
-extern const uint8_t BA_FBSHAPE[BA_NFBSHAPES][BA_NBANDS];   /* die Pegel der Bänder je Form (P_FB1..P_FB10) */
-enum { FM_OFF, FM_LFO, FM_CLOCK, FM_ENV, BA_NFBMODS };
-extern const char *const BA_FBMOD_NAME[BA_NFBMODS];
+enum { FM_OFF, FM_LFO, FM_CLOCK, FM_ENV };
+/* die 12 Effekt-Presets: alles, was die Filterbank und der Hall brauchen; AMOUNT und MOTION fahren sie hoch */
+typedef struct {
+    const char *name;
+    uint8_t band[BA_NBANDS];             /* die Pegel der Bänder: 90 = 0 dB, 127 = +6 dB, 0 = zu */
+    int8_t reso;                         /* bei vollem AMOUNT: -100 .. 100 (negativ: invertierte Rückkopplung) */
+    uint8_t drive, mix, spread;          /* bei vollem AMOUNT, 0 .. 100 */
+    uint8_t mod, depth;                  /* FM_*, und wie tief bei voller MOTION (0 .. 100) */
+    uint8_t rv_size, rv_decay, rv_tone;  /* der Raum, 0 .. 100 */
+} ba_fxpreset;
+#define BA_NFX 12
+extern const ba_fxpreset BA_FXPRESET[BA_NFX];
+extern const char *const BA_FX_NAME[BA_NFX];
 #define BA_NPROB 7
 extern const char *const BA_PROB_NAME[BA_NPROB];   /* 100 %, 75 %, 50 %, 25 %, 1/2, 1/3, 1/4 */
 
