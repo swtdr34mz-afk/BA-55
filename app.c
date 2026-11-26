@@ -69,28 +69,34 @@ static int patch_ok(const ba_patch *p)
 
 static ba_patch *slot_patch(int s) { return &bank[s >= 8].p[s & 7]; }
 
-/* ein Klang aus v0.1 (vor den FX: 31 Parameter, 426 Bytes) in die neue Form: alles bleibt, die FX kommen aus
- * (MIX 0), mit ihren Standardwerten. old darf im selben Speicher liegen (es wird zuerst kopiert) */
-#define V1_NP 31
-#define V1_PATCH 426
-static void patch_from_v1(const uint8_t *old, ba_patch *np)
+/* ein Klang aus einer älteren Version in die neue Form: alles bleibt, was neu ist, kommt mit seinem Standardwert
+ * (aus v0.1, vor den FX: 31 Parameter, 426 Bytes, die FX aus; aus v0.2, vor der Hall-Seite: 35 Parameter, 430 Bytes).
+ * old darf im selben Speicher liegen (es wird zuerst kopiert) */
+#define OLD_PATCH(np) ((BA_NAMELEN + 2 + (np) + (int)sizeof(((ba_patch *)0)->seq) + 1) & ~1)
+static const uint8_t OLD_NP[2] = {31, 35};
+#define V1_PATCH OLD_PATCH(31)
+_Static_assert(OLD_PATCH(31) == 426 && OLD_PATCH(35) == 430, "die alten Klang-Größen");
+static void patch_from_old(const uint8_t *old, ba_patch *np, int onp)
 {
-    uint8_t o[V1_PATCH];
-    memcpy(o, old, V1_PATCH);
+    uint8_t o[OLD_PATCH(35)];
+    memcpy(o, old, (size_t)OLD_PATCH(onp));
     ba_patch_init(np);
     memcpy(np->name, o, BA_NAMELEN);
     memcpy(&np->bpm, o + BA_NAMELEN, 2);
-    memcpy(np->p, o + BA_NAMELEN + 2, V1_NP);
-    memcpy(np->seq, o + BA_NAMELEN + 2 + V1_NP, sizeof np->seq);
+    memcpy(np->p, o + BA_NAMELEN + 2, (size_t)onp);
+    memcpy(np->seq, o + BA_NAMELEN + 2 + onp, sizeof np->seq);
 }
 
 static void bank_load(int b)
 {
-    int i, got = plat_store_load(OBJ_BANK_A + (uint32_t)b, &bank[b], sizeof bank[b]), ok;
-    if (got == 4 + 8 * V1_PATCH && bank[b].magic == BANK_MAGIC)   /* eine Bank aus v0.1: von hinten nach vorn umsetzen */
-        for (i = 7; i >= 0; i--)
-            patch_from_v1((const uint8_t *)&bank[b] + 4 + i * V1_PATCH, &bank[b].p[i]);
-    ok = (got == (int)sizeof bank[b] || got == 4 + 8 * V1_PATCH) && bank[b].magic == BANK_MAGIC;
+    int i, v, got = plat_store_load(OBJ_BANK_A + (uint32_t)b, &bank[b], sizeof bank[b]), ok = 0;
+    for (v = 0; v < 2; v++)              /* eine Bank aus einer älteren Version: von hinten nach vorn umsetzen */
+        if (got == 4 + 8 * OLD_PATCH(OLD_NP[v]) && bank[b].magic == BANK_MAGIC) {
+            for (i = 7; i >= 0; i--)
+                patch_from_old((const uint8_t *)&bank[b] + 4 + i * OLD_PATCH(OLD_NP[v]), &bank[b].p[i], OLD_NP[v]);
+            ok = 1;
+        }
+    ok = (ok || got == (int)sizeof bank[b]) && bank[b].magic == BANK_MAGIC;
     for (i = 0; ok && i < 8; i++)
         ok = patch_ok(&bank[b].p[i]);
     if (!ok) {
@@ -116,10 +122,13 @@ static void edited(void)
 static void settings_load(void)
 {
     int off = (int)__builtin_offsetof(settings_t, edit), got = plat_store_load(OBJ_SETTINGS, &set, sizeof set);
-    if (got == ((off + V1_PATCH + 3) & ~3) && set.magic == SET_MAGIC) {   /* aus v0.1: der Klang in Arbeit bleibt */
-        patch_from_v1((const uint8_t *)&set + off, &set.edit);
-        got = (int)sizeof set;
-    }
+    int v;
+    for (v = 0; v < 2; v++)              /* aus einer älteren Version: der Klang in Arbeit bleibt */
+        if (got == ((off + OLD_PATCH(OLD_NP[v]) + 3) & ~3) && set.magic == SET_MAGIC) {
+            patch_from_old((const uint8_t *)&set + off, &set.edit, OLD_NP[v]);
+            got = (int)sizeof set;
+            break;
+        }
     if (got != (int)sizeof set || set.magic != SET_MAGIC
         || set.slot >= NSLOTS || !patch_ok(&set.edit) || set.oct > 6u || set.bend < 1u || set.bend > 12u
         || set.mch > 16u || set.tune > 20u || set.grv.style >= BA_NSTYLES || set.grv.kick > 127u
@@ -175,10 +184,10 @@ static void e_arp(int on)
 
 /* ------------------------------------------------------------------ Seiten --- */
 enum { PG_VCO, PG_VCF, PG_ENV, PG_LFO, PG_LFO2, PG_STEP, PG_STEP2, PG_STEP3, PG_PATT, PG_SETUP, PG_RND, PG_SCALE,
-       PG_ARP, PG_GRV, PG_GSET, PG_FX, NPAGES };
+       PG_ARP, PG_GRV, PG_GSET, PG_FX, PG_RV, NPAGES };
 static const char *const PAGE_NAME[NPAGES] = {"VCO", "VCF", "ENV", "LFO", "LFO", "STEP", "STEP MOD", "STEP PITCH ENV",
                                               "PATTERN", "SETTINGS", "RND PATT", "SCALE", "ARPEGGIATOR", "GROOVE",
-                                              "GROOVE SETUP", "FX"};
+                                              "GROOVE SETUP", "FX", "REVERB"};
 
 enum { K_NONE, K_PARAM, K_SSEL, K_SNOTE, K_SGATE, K_SFL, K_SMOD, K_SPROB, K_SPED, K_SPEK, K_TEMPO, K_TUNE, K_MCH,
        K_BEND, K_GRV };
@@ -202,6 +211,7 @@ static const kdef PAGE_K[NPAGES][4] = {
     {{K_GRV, GV_STYLE}, {K_GRV, GV_KICK}, {K_GRV, GV_DRUMS}, {K_GRV, GV_PUMP}},
     {{K_GRV, GV_REL}, {K_GRV, GV_HATS}, {K_GRV, GV_TUNE}, {K_GRV, GV_VAR}},
     {{K_PARAM, P_FX}, {K_PARAM, P_FXAMT}, {K_PARAM, P_FXMOT}, {K_PARAM, P_RVMIX}},
+    {{K_PARAM, P_RVFILT}, {K_PARAM, P_RVMOD}, {K_PARAM, P_RVDRV}, {K_PARAM, P_RVDUCK}},
 };
 
 static uint8_t *grv_field(int f)
@@ -493,6 +503,25 @@ static void val_text(kdef d, char *t)
         case P_RAMT: int_text(v * 100 / 127, t); text_cat(t, "%"); return;
         case P_FXAMT: int_text(v * 100 / 127, t); text_cat(t, "%"); return;
         case P_RVMIX: int_text(v * 100 / 127, t); text_cat(t, "%"); return;
+        case P_RVMOD:
+        case P_RVDRV:
+        case P_RVDUCK:
+            if (v < 2) {
+                text_cat(t, "OFF");
+                return;
+            }
+            int_text(v * 100 / 127, t);
+            text_cat(t, "%");
+            return;
+        case P_RVFILT:                   /* bipolar: links dunkel (Tiefpass), rechts dünn (Hochpass), Mitte aus */
+            if (v >= 63 && v <= 65) {
+                text_cat(t, "OFF");
+                return;
+            }
+            hz_text(v < 64 ? 18000.0f * fm_exp2f((float)(v - 64) / 63.0f * 6.0f)
+                           : 20.0f * fm_exp2f((float)(v - 64) / 63.0f * 7.3f), t);
+            text_cat(t, v < 64 ? " LP" : " HP");
+            return;
         case P_FXMOT:                    /* je nach Effekt: Hz, eine Teilung im Takt, oder wie schnell */
             if (v < 2) {
                 text_cat(t, "STILL");
@@ -866,7 +895,7 @@ static void button(uint32_t i)
     case B_SEQ: page_set(ui.page == PG_STEP ? PG_STEP2 : ui.page == PG_STEP2 ? PG_STEP3 : PG_STEP); break;
     case B_GLO: page_set(ui.page == PG_PATT ? PG_SETUP : PG_PATT); break;
     case B_EDIT: page_set(ui.page == PG_RND ? PG_SCALE : PG_RND); break;
-    case B_FX: page_set(PG_FX); break;   /* FX: eine Seite, vier Regler */
+    case B_FX: page_set(ui.page == PG_FX ? PG_RV : PG_FX); break;   /* FX: die Effekte, nochmal: der Hall */
     case B_PLAY: play_toggle(); break;
     case B_REC:
         ui.rec_t = plat_ms();            /* was REC tut, entscheidet das Loslassen (oder 1 s Halten) */
@@ -1027,7 +1056,7 @@ void app_input_only(void) { input(); }
 static void lights(void)
 {
     static const uint8_t PAGE_BTN[NPAGES] = {B_HOME, B_SEL, B_ENV, B_LFO, B_LFO, B_SEQ, B_SEQ, B_SEQ, B_GLO, B_GLO,
-                                             B_EDIT, B_EDIT, B_ARP, B_HOME, B_HOME, B_FX};
+                                             B_EDIT, B_EDIT, B_ARP, B_HOME, B_HOME, B_FX, B_FX};
     uint32_t btn = 1u << PAGE_BTN[ui.page], dimb, lit = 0, k;
     if (ui.playing)
         btn |= LED_PLAY_GREEN;
@@ -1438,8 +1467,8 @@ static void draw_knob(int k, int32_t cx, int32_t y, uint32_t now)
 /* ---- die Seitengruppen: kleine LEDs ---- */
 static void group_of(int pg, int *i, int *n)
 {
-    static const uint8_t G0[NPAGES] = {0, 0, 0, 0, 1, 0, 1, 2, 0, 1, 0, 1, 0, 1, 2, 0};
-    static const uint8_t GN[NPAGES] = {3, 1, 1, 2, 2, 3, 3, 3, 2, 2, 2, 2, 1, 3, 3, 1};
+    static const uint8_t G0[NPAGES] = {0, 0, 0, 0, 1, 0, 1, 2, 0, 1, 0, 1, 0, 1, 2, 0, 1};
+    static const uint8_t GN[NPAGES] = {3, 1, 1, 2, 2, 3, 3, 3, 2, 2, 2, 2, 1, 3, 3, 2, 2};
     *i = G0[pg];
     *n = GN[pg];
 }
@@ -1762,6 +1791,41 @@ static void show_fx(void)
         }
 }
 
+/* REVERB: der Hall als roter Nebel über die ganze Breite, von links (tief) nach rechts (hoch): FILTER schneidet ihn
+ * links oder rechts ab, MOD lässt ihn wogen, DRIVE streut helle Funken hinein, DUCK drückt ihn bei jeder Kick (oder
+ * solange der Bass spielt) zusammen, eine helle Linie oben zeigt, wie weit */
+static void show_rv(void)
+{
+    int x, y;
+    float rv = (float)edit.p[P_RVMIX] / 127.0f, rl = sat01(ba_reverb_level(&eng) * 4.0f);
+    float fv = ((float)edit.p[P_RVFILT] - 64.0f) / 63.0f, md = (float)edit.p[P_RVMOD] / 127.0f;
+    float dr = (float)edit.p[P_RVDRV] / 127.0f, dk = ba_reverb_duck(&eng) * (float)edit.p[P_RVDUCK] / 127.0f;
+    float ph = (float)(plat_ms() % 4000u) / 4000.0f;
+    uint32_t r = 2463534242u + (plat_ms() / 90u) * 2654435761u;
+    for (x = 0; x < MX_W; x++) {
+        float fx = (float)x / (float)(MX_W - 1), shape = 1.0f, wob, top;
+        if (fv < -0.02f)                 /* dunkel: von rechts her abgeschnitten */
+            shape = sat01((1.0f + fv * 0.9f - fx) * 6.0f);
+        else if (fv > 0.02f)             /* dünn: von links her */
+            shape = sat01((fx - fv * 0.85f) * 6.0f);
+        wob = md * 0.22f * fm_sinf(6.2831853f * (fx * 1.5f + ph * (1.0f + md * 3.0f)));
+        top = (0.3f + 0.6f * rl + wob) * shape * (1.0f - 0.85f * dk);
+        for (y = 0; y < MX_H; y++) {
+            float a = (float)(MX_H - 1 - y) / (float)MX_H;
+            r ^= r << 13;
+            r ^= r >> 17;
+            r ^= r << 5;
+            if (rv > 0.01f && top > 0.0f && a < top && (float)(r & 255u) < (70.0f + 185.0f * rv) * (1.0f - a / top))
+                mx_dot(x, y, 50 + (int)(180.0f * (1.0f - a / top) * (0.4f + 0.6f * rl)));
+            else if (dr > 0.05f && rv > 0.01f && a < top + 0.1f && (r >> 8 & 255u) < (uint32_t)(dr * 14.0f))
+                mx_dot(x, y, 255);       /* DRIVE: Funken */
+        }
+    }
+    if (edit.p[P_RVDUCK] >= 2)           /* DUCK: wie weit er gerade weg ist */
+        for (x = 0; x < MX_W; x += 2)
+            mx_dot(x, (int)(dk * (float)(MX_H - 1)), 200);
+}
+
 static void show_groove(void)            /* GROOVE: die fünf Spuren über zwei Takte, der laufende Step hell; unten die Pumpe */
 {
     int lane, i, cur = ba_groove_step(&eng), x;
@@ -1821,7 +1885,7 @@ static int view_animated(void)
 {
     return ui.page == PG_VCO || ui.page == PG_VCF || ui.page == PG_ENV || ui.page == PG_LFO || ui.page == PG_LFO2
            || ui.page == PG_SETUP || (ui.page == PG_ARP && ui.arp) || ui.page == PG_GRV || ui.page == PG_GSET
-           || ui.page == PG_FX;
+           || ui.page == PG_FX || ui.page == PG_RV;
 }
 
 static const char *view_title(char *t)
@@ -1873,6 +1937,12 @@ static const char *view_title(char *t)
         text_cat(t, "/12");
         return t;
     }
+    case PG_RV:
+        if (edit.p[P_RVMIX] < 2)
+            return "REVERB OFF";
+        if (edit.p[P_RVDUCK] >= 2 && eng.gv && eng.gv->on)
+            return "DUCK KICK";
+        return edit.p[P_RVDUCK] >= 2 ? "DUCK BASS" : "REVERB ON";
     default: text_cat(t, eng.ext ? "MIDI CLOCK" : "TEMPO"); return t;
     }
 }
@@ -2036,6 +2106,7 @@ static void draw_low(void)
         case PG_GRV:
         case PG_GSET: show_groove(); break;
         case PG_FX: show_fx(); break;
+        case PG_RV: show_rv(); break;
         default: show_glo(); break;
         }
         mx_draw(15);
@@ -2437,6 +2508,10 @@ int app_expect(const char *what, int *got)
     }
     if (!strcmp(what, "reverb")) {      /* reverb: 1 wenn der Hall seinen Speicher hat; reverb_lvl: wie laut er klingt (x1000) */
         *got = eng.rv != 0;
+        return 1;
+    }
+    if (!strncmp(what, "rvduck_ge", 9)) {   /* rvduck_geN: der Hall ist gerade mindestens N/1000 weggedrückt (1) */
+        *got = (int)(ba_reverb_duck(&eng) * 1000.0f) >= atoi(what + 9);
         return 1;
     }
     if (!strncmp(what, "reverb_ge", 9)) {   /* reverb_geN: der Hall klingt mit mindestens N/1000 (1) */

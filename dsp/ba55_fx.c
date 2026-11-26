@@ -28,6 +28,9 @@ void ba_fx_memory(ba_engine *e, float *rv)
     }
     e->rv_pre = rv + at;
     at += RV_PRE_MAX;
+    e->rv_ch[0] = rv + at;
+    e->rv_ch[1] = rv + at + BA_RV_CH;
+    at += 2 * BA_RV_CH;
     if (at > BA_RV_FLOATS)
         return;
     for (i = 0; i < at; i++)
@@ -38,6 +41,7 @@ void ba_fx_memory(ba_engine *e, float *rv)
 float ba_band_level(const ba_engine *e, int b) { return b >= 0 && b < BA_NBANDS ? ba_clamp(e->fb_lvl[b], 0.0f, 1.0f) : 0.0f; }
 float ba_band_gain(const ba_engine *e, int b) { return b >= 0 && b < BA_NBANDS ? e->fb_g[b] : 0.0f; }
 float ba_reverb_level(const ba_engine *e) { return ba_clamp(e->rv_lvl, 0.0f, 1.0f); }
+float ba_reverb_duck(const ba_engine *e) { return ba_clamp(e->rv_duck, 0.0f, 1.0f); }
 
 /* das gewählte Effekt-Preset, und was AMOUNT (wie stark) und MOTION (wie bewegt) daraus machen */
 static const ba_fxpreset *fx_pre(const ba_engine *e) { return &BA_FXPRESET[ba_list_index(P_FX, e->pt->p[P_FX])]; }
@@ -82,6 +86,100 @@ static void fb_gains(ba_engine *e, int n, float in_env)
         default: break;
         }
         e->fb_g[b] = g * k;
+    }
+}
+
+/* ---- die zweite FX-Seite: was mit dem Hall passiert, bevor er zum Bass kommt ----
+ * DRIVE zerrt ihn (wenig: warm, viel: eine kaputte Fahne), FILTER (bipolar: links dunkel, rechts dünn, Mitte aus,
+ * 12 dB), MOD lässt ihn leiern wie ein Band (eine Verzögerung, deren Länge schwingt; weit auf ein zweiter Abgriff
+ * gegenläufig: Chorus, Flanger), DUCK drückt ihn weg: mit GROOVE bei jeder Kick, sonst solange der Bass spielt, und
+ * lässt ihn in den Pausen aufblühen */
+typedef struct {
+    float drv, dnorm, lpg, hpg, mdep, mrate, m2, duck, datk, drel, kick_t;
+    int filt, kick;
+    const float *in_l, *in_r;
+} rv_pp;
+
+static float onepole_g(float hz, float sr) { float w = BA_PI * ba_clamp(hz / sr, 0.0f, 0.45f); return w / (1.0f + w); }
+
+static void rv_post_setup(ba_engine *e, rv_pp *pp, const float *l, const float *r, int n)
+{
+    float fv = (float)e->pt->p[P_RVFILT] - 64.0f, dv = nrm(e->pt->p[P_RVDRV]), mv = nrm(e->pt->p[P_RVMOD]);
+    float uv = nrm(e->pt->p[P_RVDUCK]);
+    (void)n;
+    pp->filt = fv < -1.5f ? -1 : fv > 1.5f ? 1 : 0;
+    pp->lpg = onepole_g(fv < 0.0f ? 18000.0f * ba_exp2(fv / 63.0f * 6.0f) : 20000.0f, e->sr);       /* bis ~280 Hz */
+    pp->hpg = onepole_g(fv > 0.0f ? 20.0f * ba_exp2(fv / 63.0f * 7.3f) : 20.0f, e->sr);             /* bis ~3,2 kHz */
+    pp->drv = 1.0f + dv * dv * 30.0f;
+    pp->dnorm = 1.0f / (1.0f + dv * 2.5f);
+    pp->mdep = mv * mv * 380.0f;         /* Samples: bis ~9 ms Hub */
+    pp->mrate = (0.25f + 1.6f * mv) / e->sr;
+    pp->m2 = mv > 0.6f ? (mv - 0.6f) * 2.5f : 0.0f;   /* weit auf: der zweite Abgriff */
+    pp->duck = uv;
+    pp->datk = 1.0f - ba_expf(-1.0f / (0.004f * e->sr));
+    pp->drel = 1.0f - ba_expf(-1.0f / ((0.05f + 0.22f * uv) * e->sr));
+    pp->kick = e->gv && e->gv->on && e->running;
+    pp->kick_t = e->dr.sc_t;
+    pp->in_l = l;
+    pp->in_r = r;
+}
+
+static float rv_tap(const float *b, int w, float d)   /* d Samples zurück, linear dazwischen */
+{
+    int i0 = (int)d;
+    float fr = d - (float)i0, a = b[(w - i0 + 2 * BA_RV_CH) % BA_RV_CH], c = b[(w - i0 - 1 + 2 * BA_RV_CH) % BA_RV_CH];
+    return a + (c - a) * fr;
+}
+
+static void rv_post(ba_engine *e, float *sl, float *sr, rv_pp *pp, int i)
+{
+    int k;
+    float target = 0.0f;
+    for (k = 0; k < 2; k++) {
+        float *s = k ? sr : sl, x = *s;
+        if (pp->drv > 1.01f)             /* DRIVE */
+            x = ba_soft(x * pp->drv) * pp->dnorm * (1.0f + 0.15f * (pp->drv - 1.0f) / 30.0f);
+        if (pp->filt < 0) {              /* FILTER: dunkel */
+            e->rv_lp[k] += pp->lpg * (x - e->rv_lp[k]);
+            e->rv_lp2[k] += pp->lpg * (e->rv_lp[k] - e->rv_lp2[k]);
+            x = e->rv_lp2[k];
+        } else if (pp->filt > 0) {       /* FILTER: dünn */
+            e->rv_hp[k] += pp->hpg * (x - e->rv_hp[k]);
+            x -= e->rv_hp[k];
+            e->rv_hp2[k] += pp->hpg * (x - e->rv_hp2[k]);
+            x -= e->rv_hp2[k];
+        }
+        if (pp->mdep > 0.5f) {           /* MOD: die Bandleier, links und rechts gegenläufig */
+            float ph = e->rv_mph + (k ? 0.5f : 0.0f), t, d;
+            ph -= (float)(int)ph;
+            t = ph < 0.5f ? 4.0f * ph - 1.0f : 3.0f - 4.0f * ph;
+            d = 8.0f + pp->mdep * (1.0f + t);
+            e->rv_ch[k][e->rv_cw] = x;
+            x = rv_tap(e->rv_ch[k], e->rv_cw, d) * (1.0f - 0.4f * pp->m2)
+                + rv_tap(e->rv_ch[k], e->rv_cw, 8.0f + pp->mdep * (1.0f - t)) * 0.6f * pp->m2;
+        }
+        *s = x;
+    }
+    if (pp->mdep > 0.5f) {
+        if (++e->rv_cw >= BA_RV_CH)
+            e->rv_cw = 0;
+        e->rv_mph += pp->mrate;
+        if (e->rv_mph >= 1.0f)
+            e->rv_mph -= 1.0f;
+    }
+    if (pp->duck > 0.005f) {             /* DUCK: mit GROOVE die Kick (gleich nach ihr ganz weg), sonst der Bass */
+        if (pp->kick)
+            target = pp->kick_t + (float)i < 0.03f * e->sr ? 1.0f : 0.0f;
+        else {
+            float a = ba_abs(pp->in_l[i]) + ba_abs(pp->in_r[i]);
+            target = ba_clamp(a * 4.0f, 0.0f, 1.0f);
+        }
+        e->rv_duck += (target > e->rv_duck ? pp->datk : pp->drel) * (target - e->rv_duck);
+        {
+            float g = 1.0f - 0.97f * pp->duck * e->rv_duck;
+            *sl *= g;
+            *sr *= g;
+        }
     }
 }
 
@@ -154,6 +252,7 @@ static void fx_render(ba_engine *e, const float *in, float *l, float *r, int n)
         float sz = (float)fp->rv_size * 0.01f, size = 0.45f + 0.55f * sz, fb = 0.70f + 0.285f * (float)fp->rv_decay * 0.01f;
         float damp = 0.62f - 0.57f * (float)fp->rv_tone * 0.01f, pk = 0.0f, grit = 1.0f + 3.0f * ex * ex;
         int len[12], c, pre;
+        rv_pp pp;
         size += (1.0f - size) * ex;
         fb += (0.992f - fb) * ex;
         damp += (0.12f - damp) * ex;
@@ -170,6 +269,7 @@ static void fx_render(ba_engine *e, const float *in, float *l, float *r, int n)
             if (len[c] < 8)
                 len[c] = 8;
         }
+        rv_post_setup(e, &pp, l, r, n);
         for (i = 0; i < n; i++) {
             float x = (l[i] + r[i]) * 0.5f, d, sl = 0.0f, sr2 = 0.0f;
             int a;
@@ -215,6 +315,7 @@ static void fx_render(ba_engine *e, const float *in, float *l, float *r, int n)
                 sl = ba_soft(sl * grit) / grit * (1.0f + ex);
                 sr2 = ba_soft(sr2 * grit) / grit * (1.0f + ex);
             }
+            rv_post(e, &sl, &sr2, &pp, i);
             l[i] = l[i] * dry + sl * wet;
             r[i] = r[i] * dry + sr2 * wet;
         }
