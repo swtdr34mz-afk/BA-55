@@ -112,6 +112,29 @@ enum { MEV_ON, MEV_OFF, MEV_ALLOFF, MEV_PLAY, MEV_STOP, MEV_CONT, MEV_CLOCK, MEV
 typedef struct { uint8_t type, a, b; } ba_ev;
 #define BA_NEV 64
 
+/* ---- GROOVE: Kick, Drums und eine pumpende Sidechain (wie in MONSUN) ---- */
+#define BA_NSTYLES 10
+extern const char *const BA_STYLE_NAME[BA_NSTYLES];
+typedef struct {
+    uint8_t on;                          /* 1: läuft mit PLAY */
+    uint8_t style;                       /* 0..BA_NSTYLES-1 */
+    uint8_t kick, drums, pump;           /* 0..127: KICK (kurz .. boomig), DRUMS (Lautstärke), PUMP (Tiefe) */
+    uint8_t rel, hats, tune, var;        /* 0..127: RELEASE der Pumpe, HATS, TUNE (64 = 0), VAR (Variation) */
+} ba_groove;
+void ba_groove_init(ba_groove *g);
+
+typedef struct { int16_t off; uint8_t step; } ba_gtrig;
+typedef struct {
+    float kph, kenv, kt, kfreq, kdec, kclick, kdrive, kpitch;   /* Kick */
+    float cenv, ct, cbp1, cbp2;          /* Clap / Snare (Rauschen im Bandpass) */
+    float sph, senv;                     /* Snare: der Ton */
+    float henv, oenv, hlp1, hlp2;        /* Hats: geschlossen, offen */
+    float pph, pfreq, penv;              /* Perc */
+    float sc_t;                          /* Samples seit dem letzten Kick (Sidechain) */
+    float lvl_k, lvl_c, lvl_h, lvl_o, lvl_p;
+    uint32_t rs;
+} ba_drums;
+
 typedef struct {
     float sr;
     ba_patch *pt;                        /* der Klang, den die Bedienung bearbeitet */
@@ -162,6 +185,15 @@ typedef struct {
     uint8_t latched[12];
     int nlatched;
     float arp_next;
+    /* GROOVE */
+    const ba_groove *gv;
+    int g_step;
+    float g_to_next;
+    ba_gtrig gq[16];
+    int gqn;
+    ba_drums dr;
+    float sc_now;                        /* die Sidechain jetzt: 1 offen, 0 ganz geduckt (Anzeige) */
+    uint32_t kick_count;
     /* Ausgang */
     float mono[256];
     float level_now, cut_hz;
@@ -170,6 +202,9 @@ typedef struct {
 /* ------------------------------------------------------------- die Schnittstelle --- */
 void ba_init(ba_engine *e, float sr, ba_patch *pt);
 void ba_changed(ba_engine *e);
+void ba_groove_use(ba_engine *e, const ba_groove *g);   /* die GROOVE-Einstellungen (gehören der Bedienung) */
+int ba_groove_step(const ba_engine *e);  /* 0..31, -1: steht */
+int ba_groove_hit(const ba_engine *e, int lane, int step);
 void ba_render(ba_engine *e, float *l, float *r, int n);   /* n <= 256 */
 
 void ba_note_on(ba_engine *e, int note, int vel);

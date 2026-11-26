@@ -19,6 +19,10 @@ void ba_init(ba_engine *e, float sr, ba_patch *pt)
     e->bend_range = 2.0f;
     e->tune_hz = 440.0f;
     e->pitch = e->pitch_to = 36.0f;
+    e->dr.rs = 0x1B873593u;
+    e->dr.sc_t = 1e9f;
+    e->g_step = -1;
+    e->sc_now = 1.0f;
     e->dirty = 1;
 }
 
@@ -241,6 +245,8 @@ static void seq_start(ba_engine *e)
     e->transpose = 0;
     e->ext_ticks = 0;
     e->tie_hold = e->slide_next = 0;
+    e->g_step = -1;                      /* der Groove beginnt mit dem Pattern */
+    e->g_to_next = 0.0f;
 }
 
 static void seq_stop(ba_engine *e)
@@ -301,6 +307,8 @@ static void clock_tick(ba_engine *e)
     e->last_clock = e->counter ? e->counter : 1u;
     e->ext = 1;
     if (e->ext_ticks % 6 == 0) {
+        if (e->running && e->gv && e->gv->on)   /* der Groove: eine Sechzehntel je 6 Pulse */
+            groove_step(e, 0);
         if (e->running)
             advance(e);
         else if (e->arp && e->nlatched)
@@ -374,6 +382,19 @@ void ba_render(ba_engine *e, float *l, float *r, int n)
             e->to_next = 0.0f;
             e->sw_odd = 0;
         }
+        if (e->running && !e->ext && e->gv && e->gv->on) {   /* der Groove: seine Sechzehntel, mit seinem Swing */
+            int until;
+            if (e->g_to_next <= 0.0f) {
+                float g16 = e->sr * 15.0f / ba_bpm(e), sw = STYLES[grv_style(e)].swing;
+                groove_step(e, done);
+                e->g_to_next += g16 * ((e->g_step & 1) ? 1.0f - sw : 1.0f + sw);
+            }
+            until = (int)e->g_to_next;
+            if ((float)until < e->g_to_next)
+                until++;
+            if (until < chunk)
+                chunk = until < 1 ? 1 : until;
+        }
         if (e->gate_left > 0.0f) {
             int g = (int)e->gate_left;
             if ((float)g < e->gate_left)
@@ -384,6 +405,8 @@ void ba_render(ba_engine *e, float *l, float *r, int n)
         voice_render(e, out + done, chunk);
         if (!e->ext && (e->running || arp_on))
             e->to_next -= (float)chunk;
+        if (e->running && !e->ext && e->gv && e->gv->on)
+            e->g_to_next -= (float)chunk;
         if (e->gate_left > 0.0f) {
             e->gate_left -= (float)chunk;
             if (e->gate_left <= 0.0f) {
@@ -402,6 +425,10 @@ void ba_render(ba_engine *e, float *l, float *r, int n)
         float y = ba_soft(out[i] * 0.9f);
         l[i] = r[i] = y;
     }
+    if (e->gv && (e->gv->on || e->gqn))  /* GROOVE: die Pumpe und die Drums (ab hier stereo: die Hats leicht verteilt) */
+        groove_render(e, l, r, n);
+    else
+        e->sc_now = 1.0f;
     e->counter += (uint32_t)n;
 }
 

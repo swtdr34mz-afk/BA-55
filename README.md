@@ -72,6 +72,17 @@ pattern), pitch bend bends it. Velocity is not used, as on the DB-01: accents co
 | EDIT | **RND PATT** | TARGET | AMOUNT | LOW | HIGH |
 | EDIT again | **SCALE** | SCALE | ROOT | | |
 | FX | **ARPEGGIATOR** | DIR | OCT | GATE | LATCH |
+| FX again | **GROOVE** | STYLE | KICK | DRUMS | PUMP |
+| GLO a third time | **GROOVE SETUP** | RELEASE | HATS | TUNE | VAR |
+
+## GROOVE
+
+The one thing the DB-01 doesn't have, taken over from MONSUN: a beat under the bassline, and the **pumping
+sidechain**. Ten styles, two bars each: HOUSE, TECHHOUSE, TECHNO, TRANCE, ACID, DNB, DUBSTEP, GLITCHPOP, EDM, IDM, with
+their own kick, clap or snare, hi-hats and percussion, all synthesized here, and their own swing. It runs with PLAY
+(and MIDI clock), in the pattern's tempo. Every kick ducks the bassline and lets it swell back; with DRUMS fully down
+only the pump stays. The dot matrix shows the five lanes and the pump's curve, the ARP LED flashes with every kick.
+The groove settings are global: changing presets keeps the beat.
 
 ## Controls
 
@@ -82,7 +93,7 @@ pattern), pitch bend bends it. Velocity is not used, as on the DB-01: accents co
 | PRESET | The 16 slots (a sound with its pattern) |
 | SAVE | Save: PRESET picks the slot, SAVE again saves |
 | REC | STEP pages: notes in; RND PATT: a new pattern; elsewhere held 1 s: the slot's factory preset |
-| ARP | The arpeggiator on / off; on STEP pages copy / paste a step |
+| ARP | The arpeggiator on / off; on STEP pages copy / paste a step; on the GROOVE pages the groove on / off |
 | OCT- / OCT+ | The keys' octave; on STEP pages the step's octave |
 | PLAY | Start / stop |
 
