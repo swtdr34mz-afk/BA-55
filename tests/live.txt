@@ -1,0 +1,13 @@
+# SELECT and ALGORITHM are coarse for live use: 5 per detent when turned slowly
+wait 2600
+expect p6 44
+turn SELECT 4
+wait 30
+expect p6 64
+expect p4 40
+turn ALGO 4
+wait 30
+expect p4 60
+turn ALGO -20
+wait 30
+expect p4 0

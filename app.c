@@ -922,18 +922,19 @@ static void input(void)
     for (i = 0; i < 4u; i++)
         if ((e = plat_enc(EN_K1 + (int)i)) != 0)
             knob_turn((int)i, e);
+    /* SELECT und ALGORITHM: grob, für live: 5 pro Raste, schnell gedreht bis 15 (der ganze Weg in ~25 / ~9 Rasten) */
     if ((e = plat_enc(EN_SELECT)) != 0) {
         char t[12];
         int cur = ba_step_now(&eng);
         if (ui.rec_t && (btn >> B_REC & 1u) && cur >= 0) {   /* REC + CUTOFF: die Mod-Spur aufnehmen, wie am Gerät */
             ba_step *s = &edit.seq[cur];
-            s->mod = (uint8_t)iclamp(s->mod + accel(EN_SELECT, e, 2, 4) * 2, 0, 127);
+            s->mod = (uint8_t)iclamp(s->mod + accel(EN_SELECT, e, 2, 3) * 5, 0, 127);
             ui.rec_used = 1;
             edited();
             int_text((s->mod - 64) * 99 / 63, t);
             say_big(t, "MOD REC");
         } else {
-            edit.p[P_CUTOFF] = (uint8_t)iclamp(edit.p[P_CUTOFF] + accel(EN_SELECT, e, 2, 4), 0, 127);
+            edit.p[P_CUTOFF] = (uint8_t)iclamp(edit.p[P_CUTOFF] + accel(EN_SELECT, e, 2, 3) * 5, 0, 127);
             edited();
             hz_text(ba_cutoff_hz(edit.p[P_CUTOFF]), t);
             say_big(t, "CUTOFF");
@@ -942,7 +943,7 @@ static void input(void)
     }
     if ((e = plat_enc(EN_ALGO)) != 0) {      /* OVERDRIVE */
         char t[8];
-        edit.p[P_DRIVE] = (uint8_t)iclamp(edit.p[P_DRIVE] + accel(EN_ALGO, e, 3, 6), 0, 127);
+        edit.p[P_DRIVE] = (uint8_t)iclamp(edit.p[P_DRIVE] + accel(EN_ALGO, e, 2, 3) * 5, 0, 127);
         edited();
         int_text(edit.p[P_DRIVE] * 100 / 127, t);
         say_big(t, edit.p[P_DRIVE] ? "DRIVE" : "DRIVE OFF");
