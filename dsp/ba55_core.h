@@ -227,7 +227,7 @@ typedef struct {
 } ba_engine;
 
 /* FX: der Speicher des Reverbs (den gibt der Host: auf dem FM-1 der RAM-Pool); ohne ihn läuft nur die Filterbank */
-#define BA_RV_FLOATS 19400
+#define BA_RV_FLOATS 20864                /* 12 Kämme 15838 + 8 Allpässe 3218 + Pre-Delay 1800 = 20856 */
 
 /* ------------------------------------------------------------- die Schnittstelle --- */
 void ba_init(ba_engine *e, float sr, ba_patch *pt);

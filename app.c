@@ -2432,6 +2432,14 @@ int app_expect(const char *what, int *got)
         *got = 0;
         return 1;
     }
+    if (!strcmp(what, "reverb")) {      /* reverb: 1 wenn der Hall seinen Speicher hat; reverb_lvl: wie laut er klingt (x1000) */
+        *got = eng.rv != 0;
+        return 1;
+    }
+    if (!strncmp(what, "reverb_ge", 9)) {   /* reverb_geN: der Hall klingt mit mindestens N/1000 (1) */
+        *got = (int)(ba_reverb_level(&eng) * 1000.0f) >= atoi(what + 9);
+        return 1;
+    }
     if (!strcmp(what, "playing"))
         *got = ui.playing;
     else if (!strcmp(what, "step"))
