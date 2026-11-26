@@ -69,10 +69,28 @@ static int patch_ok(const ba_patch *p)
 
 static ba_patch *slot_patch(int s) { return &bank[s >= 8].p[s & 7]; }
 
+/* ein Klang aus v0.1 (vor den FX: 31 Parameter, 426 Bytes) in die neue Form: alles bleibt, die FX kommen aus
+ * (MIX 0), mit ihren Standardwerten. old darf im selben Speicher liegen (es wird zuerst kopiert) */
+#define V1_NP 31
+#define V1_PATCH 426
+static void patch_from_v1(const uint8_t *old, ba_patch *np)
+{
+    uint8_t o[V1_PATCH];
+    memcpy(o, old, V1_PATCH);
+    ba_patch_init(np);
+    memcpy(np->name, o, BA_NAMELEN);
+    memcpy(&np->bpm, o + BA_NAMELEN, 2);
+    memcpy(np->p, o + BA_NAMELEN + 2, V1_NP);
+    memcpy(np->seq, o + BA_NAMELEN + 2 + V1_NP, sizeof np->seq);
+}
+
 static void bank_load(int b)
 {
-    int i, ok = plat_store_load(OBJ_BANK_A + (uint32_t)b, &bank[b], sizeof bank[b]) == (int)sizeof bank[b]
-                && bank[b].magic == BANK_MAGIC;
+    int i, got = plat_store_load(OBJ_BANK_A + (uint32_t)b, &bank[b], sizeof bank[b]), ok;
+    if (got == 4 + 8 * V1_PATCH && bank[b].magic == BANK_MAGIC)   /* eine Bank aus v0.1: von hinten nach vorn umsetzen */
+        for (i = 7; i >= 0; i--)
+            patch_from_v1((const uint8_t *)&bank[b] + 4 + i * V1_PATCH, &bank[b].p[i]);
+    ok = (got == (int)sizeof bank[b] || got == 4 + 8 * V1_PATCH) && bank[b].magic == BANK_MAGIC;
     for (i = 0; ok && i < 8; i++)
         ok = patch_ok(&bank[b].p[i]);
     if (!ok) {
@@ -97,7 +115,12 @@ static void edited(void)
 
 static void settings_load(void)
 {
-    if (plat_store_load(OBJ_SETTINGS, &set, sizeof set) != (int)sizeof set || set.magic != SET_MAGIC
+    int off = (int)__builtin_offsetof(settings_t, edit), got = plat_store_load(OBJ_SETTINGS, &set, sizeof set);
+    if (got == ((off + V1_PATCH + 3) & ~3) && set.magic == SET_MAGIC) {   /* aus v0.1: der Klang in Arbeit bleibt */
+        patch_from_v1((const uint8_t *)&set + off, &set.edit);
+        got = (int)sizeof set;
+    }
+    if (got != (int)sizeof set || set.magic != SET_MAGIC
         || set.slot >= NSLOTS || !patch_ok(&set.edit) || set.oct > 6u || set.bend < 1u || set.bend > 12u
         || set.mch > 16u || set.tune > 20u || set.grv.style >= BA_NSTYLES || set.grv.kick > 127u
         || set.grv.drums > 127u || set.grv.pump > 127u || set.grv.rel > 127u || set.grv.hats > 127u
@@ -152,13 +175,13 @@ static void e_arp(int on)
 
 /* ------------------------------------------------------------------ Seiten --- */
 enum { PG_VCO, PG_VCF, PG_ENV, PG_LFO, PG_LFO2, PG_STEP, PG_STEP2, PG_STEP3, PG_PATT, PG_SETUP, PG_RND, PG_SCALE,
-       PG_ARP, PG_GRV, PG_GSET, NPAGES };
+       PG_ARP, PG_GRV, PG_GSET, PG_FB, PG_BANDS, PG_FBMOD, PG_RV, NPAGES };
 static const char *const PAGE_NAME[NPAGES] = {"VCO", "VCF", "ENV", "LFO", "LFO", "STEP", "STEP MOD", "STEP PITCH ENV",
                                               "PATTERN", "SETTINGS", "RND PATT", "SCALE", "ARPEGGIATOR", "GROOVE",
-                                              "GROOVE SETUP"};
+                                              "GROOVE SETUP", "FILTERBANK", "BANDS", "BANK MOD", "REVERB"};
 
 enum { K_NONE, K_PARAM, K_SSEL, K_SNOTE, K_SGATE, K_SFL, K_SMOD, K_SPROB, K_SPED, K_SPEK, K_TEMPO, K_TUNE, K_MCH,
-       K_BEND, K_GRV };
+       K_BEND, K_GRV, K_BAND, K_BLVL };
 enum { GV_STYLE, GV_KICK, GV_DRUMS, GV_PUMP, GV_REL, GV_HATS, GV_TUNE, GV_VAR };
 typedef struct { uint8_t kind, id; } kdef;
 
@@ -178,6 +201,10 @@ static const kdef PAGE_K[NPAGES][4] = {
     {{K_PARAM, P_ADIR}, {K_PARAM, P_AOCT}, {K_PARAM, P_AGATE}, {K_PARAM, P_ALATCH}},
     {{K_GRV, GV_STYLE}, {K_GRV, GV_KICK}, {K_GRV, GV_DRUMS}, {K_GRV, GV_PUMP}},
     {{K_GRV, GV_REL}, {K_GRV, GV_HATS}, {K_GRV, GV_TUNE}, {K_GRV, GV_VAR}},
+    {{K_PARAM, P_FBSHAPE}, {K_PARAM, P_FBRESO}, {K_PARAM, P_FBDRIVE}, {K_PARAM, P_FBMIX}},
+    {{K_BAND, 0}, {K_BLVL, 0}, {K_PARAM, P_FBSPREAD}, {K_NONE, 0}},
+    {{K_PARAM, P_FBMOD}, {K_PARAM, P_FBRATE}, {K_PARAM, P_FBDEPTH}, {K_NONE, 0}},
+    {{K_PARAM, P_RVSIZE}, {K_PARAM, P_RVDECAY}, {K_PARAM, P_RVTONE}, {K_PARAM, P_RVMIX}},
 };
 
 static uint8_t *grv_field(int f)
@@ -202,6 +229,7 @@ static struct {
     uint8_t intro;
     uint32_t intro_at, frame;
     uint8_t ssel;                        /* der Step im Editor */
+    uint8_t band;                        /* das Band der Filterbank auf BANDS */
     uint8_t rec;                         /* Noten einspielen */
     int8_t copied;
     ba_step clip;
@@ -379,6 +407,8 @@ static const char *knob_label(kdef d)
     case K_TUNE: return "TUNE";
     case K_MCH: return "MIDI CH";
     case K_BEND: return "BEND";
+    case K_BAND: return "BAND";
+    case K_BLVL: return "LEVEL";
     case K_GRV: {
         static const char *const N[8] = {"STYLE", "KICK", "DRUMS", "PUMP", "RELEASE", "HATS", "TUNE", "VAR"};
         return N[d.id & 7];
@@ -405,6 +435,8 @@ static int knob_get(kdef d)
     case K_MCH: return set.mch * 127 / 16;
     case K_BEND: return (set.bend - 1) * 127 / 11;
     case K_GRV: return d.id == GV_STYLE ? set.grv.style * 127 / (BA_NSTYLES - 1) : *grv_field(d.id);
+    case K_BAND: return ui.band * 127 / (BA_NBANDS - 1);
+    case K_BLVL: return edit.p[P_FB1 + ui.band];
     default: return -1;
     }
 }
@@ -465,6 +497,24 @@ static void val_text(kdef d, char *t)
             default: text_cat(t, "-"); return;
             }
         case P_RAMT: int_text(v * 100 / 127, t); text_cat(t, "%"); return;
+        case P_FBDRIVE: text_cat(t, "+"); int_text(v * v * 24 / 16129, t + 1); text_cat(t, "DB"); return;
+        case P_FBRESO: {
+            int b = (v - 64) * 100 / 63;
+            if (b > 0)
+                text_cat(t, "+");
+            int_text(b, t + txt_len(t));
+            return;
+        }
+        case P_FBRATE:
+            switch (ba_list_index(P_FBMOD, edit.p[P_FBMOD])) {
+            case FM_CLOCK: {
+                static const char *const D[6] = {"1 BAR", "1/2", "1/4", "1/8", "1/16", "1/32"};
+                text_cat(t, D[(v * 5 + 63) / 127]);
+                return;
+            }
+            case FM_ENV: ms_text(1000.0f * (0.02f + 0.6f * (1.0f - (float)v / 127.0f)), t); return;
+            default: hz_text(0.05f * fm_exp2f((float)v / 127.0f * 7.9f), t); return;
+            }
         default: break;
         }
         int_text(v * 100 / 127, t);
@@ -511,6 +561,18 @@ static void val_text(kdef d, char *t)
             int_text(set.mch, t);
         return;
     case K_BEND: int_text(set.bend, t); text_cat(t, " ST"); return;
+    case K_BAND: hz_text(BA_BAND_HZ[ui.band], t); return;
+    case K_BLVL: {                       /* in dB: 90 = 0 dB, 127 = +6 dB, ganz links zu */
+        float g = (float)v / 127.0f;
+        g = g * g * 2.0f;
+        if (v < 6) {
+            text_cat(t, "OFF");
+            return;
+        }
+        dec1_text(20.0f * fm_log2f(g) * 0.30103f, t);
+        text_cat(t, "DB");
+        return;
+    }
     case K_GRV:
         switch (d.id) {
         case GV_STYLE: text_cat(t, BA_STYLE_NAME[set.grv.style]); return;
@@ -572,6 +634,8 @@ static void seg_value(kdef d)
     case K_TUNE: int_text(430 + set.tune, t); break;
     case K_MCH: int_text(set.mch, t); break;
     case K_BEND: int_text(set.bend, t); break;
+    case K_BAND: int_text(ui.band + 1, t); break;
+    case K_BLVL: int_text(v * 99 / 127, t); break;
     case K_PARAM:
         if (BA_PARAMS[d.id].kind == MK_LIST || BA_PARAMS[d.id].kind == MK_SW) {
             if (d.id == P_FMODE) {
@@ -646,6 +710,11 @@ static void knob_turn(int k, int32_t e)
             edit.p[d.id] = (uint8_t)v;
             if (d.id == P_LAST && ui.ssel >= ba_seq_len(&eng))
                 ui.ssel = (uint8_t)(ba_seq_len(&eng) - 1);
+            if (d.id == P_FBSHAPE) {     /* eine Form setzt die zehn Bänder (danach einzeln auf BANDS) */
+                int b, sh = ba_list_index(P_FBSHAPE, v);
+                for (b = 0; b < BA_NBANDS; b++)
+                    edit.p[P_FB1 + b] = BA_FBSHAPE[sh][b];
+            }
             edited();
         }
         break;
@@ -677,6 +746,11 @@ static void knob_turn(int k, int32_t e)
         set.bend = (uint8_t)iclamp(set.bend + dir, 1, 12);
         eng.bend_range = (float)set.bend;
         dirty();
+        break;
+    case K_BAND: ui.band = (uint8_t)iclamp(ui.band + dir, 0, BA_NBANDS - 1); break;
+    case K_BLVL:
+        edit.p[P_FB1 + ui.band] = (uint8_t)iclamp(edit.p[P_FB1 + ui.band] + accel(EN_K1 + k, e, 3, 6) * 2, 0, 127);
+        edited();
         break;
     case K_GRV:
         if (d.id == GV_STYLE)
@@ -821,6 +895,8 @@ static void button(uint32_t i)
     case B_SEQ: page_set(ui.page == PG_STEP ? PG_STEP2 : ui.page == PG_STEP2 ? PG_STEP3 : PG_STEP); break;
     case B_GLO: page_set(ui.page == PG_PATT ? PG_SETUP : PG_PATT); break;
     case B_EDIT: page_set(ui.page == PG_RND ? PG_SCALE : PG_RND); break;
+    case B_FX: page_set(ui.page == PG_FB ? PG_BANDS : ui.page == PG_BANDS ? PG_FBMOD : ui.page == PG_FBMOD ? PG_RV : PG_FB);
+        break;                           /* FX: FILTERBANK, BANDS, BANK MOD, REVERB */
     case B_PLAY: play_toggle(); break;
     case B_REC:
         ui.rec_t = plat_ms();            /* was REC tut, entscheidet das Loslassen (oder 1 s Halten) */
@@ -981,7 +1057,7 @@ void app_input_only(void) { input(); }
 static void lights(void)
 {
     static const uint8_t PAGE_BTN[NPAGES] = {B_HOME, B_SEL, B_ENV, B_LFO, B_LFO, B_SEQ, B_SEQ, B_SEQ, B_GLO, B_GLO,
-                                             B_EDIT, B_EDIT, B_ARP, B_HOME, B_HOME};
+                                             B_EDIT, B_EDIT, B_ARP, B_HOME, B_HOME, B_FX, B_FX, B_FX, B_FX};
     uint32_t btn = 1u << PAGE_BTN[ui.page], dimb, lit = 0, k;
     if (ui.playing)
         btn |= LED_PLAY_GREEN;
@@ -1392,8 +1468,8 @@ static void draw_knob(int k, int32_t cx, int32_t y, uint32_t now)
 /* ---- die Seitengruppen: kleine LEDs ---- */
 static void group_of(int pg, int *i, int *n)
 {
-    static const uint8_t G0[NPAGES] = {0, 0, 0, 0, 1, 0, 1, 2, 0, 1, 0, 1, 0, 1, 2};
-    static const uint8_t GN[NPAGES] = {3, 1, 1, 2, 2, 3, 3, 3, 2, 2, 2, 2, 1, 3, 3};
+    static const uint8_t G0[NPAGES] = {0, 0, 0, 0, 1, 0, 1, 2, 0, 1, 0, 1, 0, 1, 2, 0, 1, 2, 3};
+    static const uint8_t GN[NPAGES] = {3, 1, 1, 2, 2, 3, 3, 3, 2, 2, 2, 2, 1, 3, 3, 4, 4, 4, 4};
     *i = G0[pg];
     *n = GN[pg];
 }
@@ -1684,6 +1760,55 @@ static void show_arp(void)               /* ARP: die Richtung als Treppe über d
     }
 }
 
+/* FX: die zehn Bänder als Fader-Säulen (der Pegel, mit der Modulation), was in jedem gerade klingt als heller
+ * Punkt darüber (ein kleiner Spektrum-Analysator), das gewählte Band auf BANDS umrahmt */
+static void show_bank(void)
+{
+    int b, y, c;
+    for (b = 0; b < BA_NBANDS; b++) {
+        int x0 = 2 + b * 7, h = (int)(sat01(ba_band_gain(&eng, b) * 0.5f) * (float)(MX_H - 3) + 0.5f);
+        int lv = (int)(fm_sqrtf(ba_band_level(&eng, b)) * (float)(MX_H - 2) + 0.5f), sel = ui.page == PG_BANDS && b == ui.band;
+        for (y = 0; y < h; y++)
+            for (c = 0; c < 5; c++)
+                mx_dot(x0 + c, MX_H - 1 - y, sel ? 190 : 95);
+        if (lv > 0)
+            for (c = 0; c < 5; c++)
+                mx_dot(x0 + c, MX_H - 1 - (lv < MX_H - 1 ? lv : MX_H - 1), 255);
+        if (sel)
+            for (y = 0; y < MX_H; y += 2) {
+                mx_dot(x0 - 1, y, 120);
+                mx_dot(x0 + 5, y, 120);
+            }
+    }
+    for (b = 0; b < MX_W; b += 3)        /* 0 dB als feine Linie */
+        mx_dot(b, MX_H - 1 - (MX_H - 3) / 2, 40);
+}
+
+/* REVERB: ein Nachhall, so lang wie DECAY, so dicht wie SIZE, und wie laut er gerade klingt */
+static void show_reverb(void)
+{
+    float dec = 0.70f + 0.285f * (float)edit.p[P_RVDECAY] / 127.0f, size = 0.45f + 0.55f * (float)edit.p[P_RVSIZE] / 127.0f;
+    float tone = (float)edit.p[P_RVTONE] / 127.0f, lvl = ba_reverb_level(&eng);
+    int x, y, pre = 2 + (int)(edit.p[P_RVSIZE] * 6 / 127);
+    uint32_t r = 2463534242u;
+    for (x = 0; x < MX_W; x++) {
+        float t = (float)(x - pre) / (float)MX_W, a;
+        if (x < pre)
+            continue;
+        a = fm_exp2f(-t * (1.0f - dec) * 70.0f * (1.2f - size * 0.5f));   /* die Hüllkurve des Nachhalls */
+        for (y = 0; y < MX_H; y++) {
+            float hy = (float)(MX_H - 1 - y) / (float)(MX_H - 1);
+            r ^= r << 13;
+            r ^= r >> 17;
+            r ^= r << 5;
+            if (hy < a && (float)(r & 255u) < 70.0f + 150.0f * size)
+                mx_dot(x, y, (int)(60.0f + 150.0f * (1.0f - hy) * (0.5f + 0.5f * tone)));
+        }
+    }
+    mx_line(0, MX_H - 1, 0, MX_H - 1 - (int)(sat01(lvl * 3.0f) * (float)(MX_H - 1)), 255);
+    mx_line(1, MX_H - 1, 1, MX_H - 1 - (int)(sat01(lvl * 3.0f) * (float)(MX_H - 1)), 255);
+}
+
 static void show_groove(void)            /* GROOVE: die fünf Spuren über zwei Takte, der laufende Step hell; unten die Pumpe */
 {
     int lane, i, cur = ba_groove_step(&eng), x;
@@ -1742,7 +1867,8 @@ static void show_glo(void)               /* SETTINGS: das Tempo im Takt, die Las
 static int view_animated(void)
 {
     return ui.page == PG_VCO || ui.page == PG_VCF || ui.page == PG_ENV || ui.page == PG_LFO || ui.page == PG_LFO2
-           || ui.page == PG_SETUP || (ui.page == PG_ARP && ui.arp) || ui.page == PG_GRV || ui.page == PG_GSET;
+           || ui.page == PG_SETUP || (ui.page == PG_ARP && ui.arp) || ui.page == PG_GRV || ui.page == PG_GSET
+           || ui.page >= PG_FB;
 }
 
 static const char *view_title(char *t)
@@ -1785,6 +1911,21 @@ static const char *view_title(char *t)
     case PG_GSET:
         text_cat(t, set.grv.on ? BA_STYLE_NAME[set.grv.style] : "GROOVE OFF");
         return t;
+    case PG_FB:
+        if (edit.p[P_FBMIX] < 2)
+            return "BANK OFF";
+        return BA_FBSHAPE_NAME[ba_list_index(P_FBSHAPE, edit.p[P_FBSHAPE])];
+    case PG_BANDS: {
+        char n[8];
+        text_cat(t, "BAND ");
+        int_text(ui.band + 1, n);
+        text_cat(t, n);
+        text_cat(t, " ");
+        hz_text(BA_BAND_HZ[ui.band], t + txt_len(t));
+        return t;
+    }
+    case PG_FBMOD: return BA_FBMOD_NAME[ba_list_index(P_FBMOD, edit.p[P_FBMOD])];
+    case PG_RV: return edit.p[P_RVMIX] < 2 ? "REVERB OFF" : "REVERB";
     default: text_cat(t, eng.ext ? "MIDI CLOCK" : "TEMPO"); return t;
     }
 }
@@ -1908,6 +2049,10 @@ static void draw_low(void)
         case PG_ARP: show_arp(); break;
         case PG_GRV:
         case PG_GSET: show_groove(); break;
+        case PG_FB:
+        case PG_BANDS:
+        case PG_FBMOD: show_bank(); break;
+        case PG_RV: show_reverb(); break;
         default: show_glo(); break;
         }
         mx_draw(15);
@@ -2092,6 +2237,8 @@ static void intro_draw(float t)
 }
 
 /* ------------------------------------------------------------ der Vertrag --- */
+static float fx_rv[BA_RV_FLOATS] __attribute__((section(".pool")));
+
 void app_init(void)
 {
     int i;
@@ -2102,6 +2249,7 @@ void app_init(void)
     eng.bend_range = (float)set.bend;
     eng.tune_hz = 430.0f + (float)set.tune;
     ba_groove_use(&eng, &set.grv);
+    ba_fx_memory(&eng, fx_rv);           /* der Reverb: sein Speicher im RAM-Pool */
     for (i = 0; i < NKEYS; i++)
         ui.key_note[i] = -1;
     ui.copied = -1;

@@ -1,7 +1,8 @@
 # BA-55
 
-A bassline for the M-VAVE FM-1 by **swtdr34mz**, after the Erica Synths Bassline DB-01, and with only what the DB-01
-itself has: no extra effects, no extra modulators.
+A bassline for the M-VAVE FM-1 by **swtdr34mz**, after the Erica Synths Bassline DB-01. The voice and the sequencer have
+only what the DB-01 itself has; on top come three extras on their own buttons: **GROOVE** (HOME twice), and on FX a
+**resonant filterbank** after Erica's Resonant Filterbank and a **reverb**.
 
 On the screen, the look of its panel: matte black, sandblasted aluminium in a soft light from the top left; white
 silkscreen with wide letter spacing and hairline white frames with round corners around the sections; black
@@ -62,6 +63,10 @@ pattern), pitch bend bends it. Velocity is not used, as on the DB-01: accents co
 | HOME | **VCO** | WAVE | SUB | NOISE | DETUNE |
 | HOME again | **GROOVE** | STYLE | KICK | DRUMS | PUMP |
 | HOME a third time | **GROOVE SETUP** | RELEASE | HATS | TUNE | VAR |
+| FX | **FILTERBANK** | SHAPE | RESO | DRIVE | MIX |
+| FX again | **BANDS** | BAND | LEVEL | SPREAD | |
+| FX a third time | **BANK MOD** | MODE | RATE | DEPTH | |
+| FX a fourth time | **REVERB** | SIZE | DECAY | TONE | MIX |
 | SEL | **VCF** | CUTOFF | RESO | MODE | DRIVE |
 | ENV | **ENV** | DECAY | DEPTH | RELEASE | GLIDE |
 | LFO | **LFO** | RATE | FM LVL | LFO LVL | SHAPE |
@@ -74,6 +79,26 @@ pattern), pitch bend bends it. Velocity is not used, as on the DB-01: accents co
 | EDIT | **RND PATT** | TARGET | AMOUNT | LOW | HIGH |
 | EDIT again | **SCALE** | SCALE | ROOT | | |
 | ARP | **ARPEGGIATOR** (and the arpeggiator on / off) | DIR | OCT | GATE | LATCH |
+
+## FX: the filterbank and the reverb
+
+Only the bassline goes through them; the GROOVE drums come after and stay dry.
+
+- **The filterbank**, after the Erica Synths Resonant Filterbank: ten band-pass filters at the original's fixed
+  frequencies (29, 61, 115, 218, 411, 777 Hz, 1.5, 2.8, 5.2, 11 kHz), each about an octave wide with its own LEVEL
+  (BANDS: BAND picks one, LEVEL sets it, 0 dB at 90, +6 dB fully up, off fully down). **SHAPE** sets all ten at once:
+  FLAT, SMILE, SCOOP, LOW, HIGH, PEAKS, COMB, VOWEL A, VOWEL O, VOWEL E, PHONE, ACID. **RESO** is bipolar, as on the
+  original: from the middle to the right it feeds every band back into itself, from a slight edge to a howl that
+  rings on; to the left the feedback is inverted. **DRIVE** is the input stage, up to +24 dB. **SPREAD** pans the
+  bands left and right. **MIX** brings the bank in (fully down: off).
+- **BANK MOD**: LFO (a wave runs through the bands, 0.05 to 12 Hz), CLOCK (a spotlight jumps from band to band in
+  tempo, 1 bar to 1/32 per band), ENV (an envelope follower: the louder, the higher the bank opens; RATE is its
+  release). DEPTH says how far.
+- **The reverb**: SIZE (the room, and its pre-delay with it), DECAY, TONE (dark to bright), MIX (fully down: off).
+
+The dot matrix shows the ten bands as faders, with what sounds in each as a bright dot on top (a small spectrum
+analyser), and the reverb's tail. The FX settings belong to each preset; presets saved with v0.1 keep everything and
+get the FX switched off.
 
 ## GROOVE
 
