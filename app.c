@@ -665,6 +665,7 @@ static int32_t knob_step(int k, int32_t e)
     }
 }
 
+static int coarse(int k, int32_t e);
 static void knob_turn(int k, int32_t e)
 {
     kdef d = kdef_of(k);
@@ -682,6 +683,8 @@ static void knob_turn(int k, int32_t e)
             v = ba_list_value(d.id, ba_list_index(d.id, v) + dir);
         else if (pi->kind == MK_SW)
             v = dir > 0 ? 127 : 0;
+        else if (d.id == P_RVMIX)        /* REVERB: grob wie SELECT, 2,5 pro Raste, damit man live schnell hinkommt */
+            v = iclamp(v + coarse(EN_K1 + k, e), 0, 127);
         else
             v = iclamp(v + knob_step(k, e), 0, 127);
         if (v != edit.p[d.id]) {
