@@ -1,0 +1,39 @@
+# every page once, with a screenshot (preset 14, MODTRAK)
+wait 2600
+turn PRESET -3
+wait 100
+expect slot 13
+tap HOME
+shot p_vco.png
+tap SEL
+shot p_vcf.png
+tap ENV
+shot p_env.png
+tap LFO
+shot p_lfo.png
+tap LFO
+shot p_lfo2.png
+tap SEQ
+shot p_step.png
+tap SEQ
+shot p_step2.png
+tap SEQ
+shot p_step3.png
+tap GLO
+shot p_patt.png
+tap GLO
+shot p_setup.png
+tap EDIT
+shot p_rnd.png
+tap EDIT
+shot p_scale.png
+tap FX
+shot p_arp.png
+tap SAVE
+turn PRESET 2
+wait 30
+shot p_save.png
+tap SAVE
+wait 30
+expect slot 15
+expect edited 0

@@ -1,0 +1,14 @@
+# the knobs' speed: VCO, VCF and ENV fast, the rest fine
+wait 2600
+expect p1 30
+turn K2 6
+wait 30
+expect p1 48
+tap SEL
+turn K2 4
+wait 30
+expect p7 110
+tap LFO
+turn K1 4
+wait 30
+expect p12 64

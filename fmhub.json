@@ -1,0 +1,9 @@
+{
+  "what": "A bassline after the Erica Synths DB-01, with only what the DB-01 has: one VCO with sub and noise, BBD detune, overdrive, a Polivoks-style LP/BP filter, a drone-capable VCA, an LFO with 10 shapes, and its 64-step sequencer with accent, slide, mod track, pitch envelope and probability per step, play modes, random patterns, scales and an arpeggiator.",
+  "author": "swtdr34mz",
+  "kinds": "synth",
+  "play": "https://swtdr34mz-afk.github.io/BA-55/emu/",
+  "image": "site/img/screen-main.png",
+  "color": "#FF2648",
+  "sounds": "none"
+}

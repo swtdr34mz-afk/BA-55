@@ -1,0 +1,26 @@
+# SPDX-License-Identifier: MPL-2.0
+# BA-55 words for a screen reader (fm1-reader): the text on the screen <TAB> what to say.
+# url: https://swtdr34mz-afk.github.io/BA-55/words/
+BA-55	B A fifty-five
+BPM	B P M
+VCO	V C O
+VCF	V C F
+VCA	V C A
+ENV	envelope
+LP	low pass
+BP	band pass
+SUB	sub
+ST	semitones
+ACC	accent
+SQR	square
+TRI	triangle
+RESO	resonance
+FM LVL	F M level
+LFO LVL	L F O level
+RND PATT	random pattern
+PP	ping pong
+PP2	ping pong two
+FWD	forward
+BWD	backward
+RND	random
+ACC/SLD	accent and slide
