@@ -1,0 +1,43 @@
+# FX twice: REVERB (FILTER, MOD, DRIVE, DUCK); with GROOVE the reverb ducks under every kick
+wait 2600
+tap FX
+wait 30
+expect page 15
+turn K4 24
+wait 30
+tap FX
+wait 30
+expect page 16
+expect p35 64
+turn K1 -20
+turn K2 30
+turn K3 20
+turn K4 40
+wait 30
+expect p36 30
+tap PLAY
+wav reverb.wav
+wait 1500
+shot rv_dark.png
+turn K1 40
+wait 800
+shot rv_thin.png
+expect reverb_ge5 1
+tap HOME
+tap HOME
+wait 30
+tap REC
+wait 30
+expect groove 1
+tap FX
+tap FX
+wait 1200
+expect rvduck_ge300 1
+shot rv_duck.png
+wavstop
+expect peak_db_min -30
+tap PLAY
+wait 100
+tap FX
+wait 30
+expect page 15

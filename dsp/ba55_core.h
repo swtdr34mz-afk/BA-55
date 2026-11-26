@@ -44,6 +44,7 @@ enum {
     /* FX: ein Effekt-Preset (Filterbank nach der Erica Synths Resonant Filterbank, Bewegung, Raum), wie stark,
      * wie bewegt, und der Hall */
     P_FX, P_FXAMT, P_FXMOT, P_RVMIX,
+    P_RVFILT, P_RVMOD, P_RVDRV, P_RVDUCK,   /* FX zweite Seite: der Hall (v0.3) */
     BA_NP
 };
 
@@ -221,13 +222,17 @@ typedef struct {
     float *rv_comb[12], *rv_ap[8], *rv_pre, rv_cf[12];
     int rv_clen[12], rv_cpos[12], rv_alen[8], rv_apos[8], rv_pre_len, rv_pre_pos;
     float rv_lvl, rv_ph;
+    float rv_lp[2], rv_lp2[2], rv_hp[2], rv_hp2[2];   /* FILTER auf dem Hall */
+    float *rv_ch[2], rv_mph, rv_duck;     /* MOD: die Bandleier-Verzögerung je Seite; DUCK: wie weit er gerade weg ist */
+    int rv_cw;
     /* Ausgang */
     float mono[256];
     float level_now, cut_hz;
 } ba_engine;
 
 /* FX: der Speicher des Reverbs (den gibt der Host: auf dem FM-1 der RAM-Pool); ohne ihn läuft nur die Filterbank */
-#define BA_RV_FLOATS 20864                /* 12 Kämme 15838 + 8 Allpässe 3218 + Pre-Delay 1800 = 20856 */
+#define BA_RV_CH 1024                    /* MOD: die Verzögerung je Seite (23 ms) */
+#define BA_RV_FLOATS (20864 + 2 * BA_RV_CH) /* 12 Kämme 15838 + 8 Allpässe 3218 + Pre-Delay 1800 = 20856, + MOD */
 
 /* ------------------------------------------------------------- die Schnittstelle --- */
 void ba_init(ba_engine *e, float sr, ba_patch *pt);
@@ -240,6 +245,7 @@ void ba_fx_memory(ba_engine *e, float *rv);   /* BA_RV_FLOATS floats für den Re
 float ba_band_level(const ba_engine *e, int band);   /* für die Anzeige: was im Band gerade klingt, 0..1 */
 float ba_band_gain(const ba_engine *e, int band);    /* und wie weit es gerade offen ist (mit der Modulation) */
 float ba_reverb_level(const ba_engine *e);
+float ba_reverb_duck(const ba_engine *e);      /* DUCK: wie weit der Hall gerade weggedrückt ist, 0..1 */
 
 void ba_note_on(ba_engine *e, int note, int vel);
 void ba_note_off(ba_engine *e, int note);

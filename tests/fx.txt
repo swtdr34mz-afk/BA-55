@@ -33,4 +33,4 @@ tap PLAY
 wait 100
 tap FX
 wait 30
-expect page 15
+expect page 16

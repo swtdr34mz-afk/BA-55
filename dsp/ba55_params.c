@@ -89,6 +89,10 @@ const ba_param_info BA_PARAMS[BA_NP] = {
     {"FX Amount", "AMOUNT", 0, MK_UNI, 0, 0},
     {"FX Motion", "MOTION", 50, MK_UNI, 0, 0},
     {"Reverb", "REVERB", 0, MK_UNI, 0, 0},
+    {"Reverb Filter", "FILTER", 64, MK_BIP, 0, 0},
+    {"Reverb Mod", "MOD", 0, MK_UNI, 0, 0},
+    {"Reverb Drive", "DRIVE", 0, MK_UNI, 0, 0},
+    {"Reverb Duck", "DUCK", 0, MK_UNI, 0, 0},
 };
 
 /* ------------------------------------------------------------- Umrechnungen --- */

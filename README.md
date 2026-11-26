@@ -64,6 +64,7 @@ pattern), pitch bend bends it. Velocity is not used, as on the DB-01: accents co
 | HOME again | **GROOVE** | STYLE | KICK | DRUMS | PUMP |
 | HOME a third time | **GROOVE SETUP** | RELEASE | HATS | TUNE | VAR |
 | FX | **FX** | FX | AMOUNT | MOTION | REVERB |
+| FX again | **REVERB** | FILTER | MOD | DRIVE | DUCK |
 | SEL | **VCF** | CUTOFF | RESO | MODE | DRIVE |
 | ENV | **ENV** | DECAY | DEPTH | RELEASE | GLIDE |
 | LFO | **LFO** | RATE | FM LVL | LFO LVL | SHAPE |
@@ -96,6 +97,18 @@ drums come after and stay dry.
   own room. From the middle on it turns experimental, with every effect: the room grows, the tail becomes almost
   endless, the reverb drifts and shimmers, gets brighter and dirtier and pushes the dry bass back. Fully up it
   hangs on like a frozen pad.
+
+FX a second time opens **REVERB**, for the reverb alone (the bass stays as it is):
+
+- **FILTER**: one knob, as on a DJ mixer: from the middle to the left the reverb gets darker (a low-pass down to
+  about 280 Hz), to the right thinner (a high-pass up to about 3 kHz); in the middle it is off.
+- **MOD**: the reverb wobbles like tape; far up a second, opposite tap turns it into chorus and flanger.
+- **DRIVE**: distorts only the reverb: a little warms it, a lot makes a broken, hissing tail.
+- **DUCK**: pushes the reverb away and lets it bloom in the gaps. With GROOVE on it ducks under every kick, without
+  it while the bass plays. DUCK sets how deep and how slowly it comes back.
+
+The dot matrix shows the reverb as fog from low (left) to high (right): FILTER cuts it, MOD makes it wave, DRIVE
+throws sparks into it, DUCK presses it down; the dotted line shows how far.
 
 The dot matrix shows the ten bands as faders, with what sounds in each as a bright dot on top (a small spectrum
 analyser), and the reverb as a red fog on the right. The title shows which of the 12 is on. The FX settings belong to
