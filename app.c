@@ -79,11 +79,11 @@ _Static_assert(OLD_PATCH(31) == 426 && OLD_PATCH(35) == 430, "die alten Klang-Gr
 static void patch_from_old(const uint8_t *old, ba_patch *np, int onp)
 {
     uint8_t o[OLD_PATCH(35)];
-    memcpy(o, old, (size_t)OLD_PATCH(onp));
+    memcpy(o, old, (uint32_t)OLD_PATCH(onp));
     ba_patch_init(np);
     memcpy(np->name, o, BA_NAMELEN);
     memcpy(&np->bpm, o + BA_NAMELEN, 2);
-    memcpy(np->p, o + BA_NAMELEN + 2, (size_t)onp);
+    memcpy(np->p, o + BA_NAMELEN + 2, (uint32_t)onp);
     memcpy(np->seq, o + BA_NAMELEN + 2 + onp, sizeof np->seq);
 }
 
