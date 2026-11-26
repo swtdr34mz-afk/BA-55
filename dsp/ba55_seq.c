@@ -307,7 +307,7 @@ static void clock_tick(ba_engine *e)
     e->last_clock = e->counter ? e->counter : 1u;
     e->ext = 1;
     if (e->ext_ticks % 6 == 0) {
-        if (e->running && e->gv && e->gv->on)   /* der Groove: eine Sechzehntel je 6 Pulse */
+        if (e->running)                  /* der Groove: eine Sechzehntel je 6 Pulse (seine Uhr läuft immer mit) */
             groove_step(e, 0);
         if (e->running)
             advance(e);
@@ -382,7 +382,7 @@ void ba_render(ba_engine *e, float *l, float *r, int n)
             e->to_next = 0.0f;
             e->sw_odd = 0;
         }
-        if (e->running && !e->ext && e->gv && e->gv->on) {   /* der Groove: seine Sechzehntel, mit seinem Swing */
+        if (e->running && !e->ext) {     /* der Groove: seine Sechzehntel, mit seinem Swing (die Uhr läuft immer mit) */
             int until;
             if (e->g_to_next <= 0.0f) {
                 float g16 = e->sr * 15.0f / ba_bpm(e), sw = STYLES[grv_style(e)].swing;
@@ -405,7 +405,7 @@ void ba_render(ba_engine *e, float *l, float *r, int n)
         voice_render(e, out + done, chunk);
         if (!e->ext && (e->running || arp_on))
             e->to_next -= (float)chunk;
-        if (e->running && !e->ext && e->gv && e->gv->on)
+        if (e->running && !e->ext)
             e->g_to_next -= (float)chunk;
         if (e->gate_left > 0.0f) {
             e->gate_left -= (float)chunk;
