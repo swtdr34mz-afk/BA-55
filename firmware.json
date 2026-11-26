@@ -5,7 +5,7 @@
   "author": "swtdr34mz",
   "license": "MPL-2.0",
   "tagline": "A bassline after the Erica Synths DB-01, with only what the DB-01 has: one VCO, sub, noise, BBD detune, overdrive, a Polivoks-style LP/BP filter, and its 64-step sequencer",
-  "description": "A monophonic bassline after the Erica Synths Bassline DB-01, with only the instrument's own controls: one VCO (triangle, saw, square), a transistor-style sub-oscillator, noise into the filter, BBD-style DETUNE (faster as it rises, FM at the end), OVERDRIVE as a blend, FM LVL from the LFO, a saturating 12 dB Polivoks / Acidbox-style filter (low-pass or band-pass, self-oscillating) with decay and depth, a sustain-release VCA (fully up: a drone), an LFO with 10 shapes, sync and reset, accent and slide per step. The DB-01 sequencer: 64 steps with note, gate 10..100 %, accent, slide, a modulation track (recorded live with REC and the cutoff), a pitch envelope per step, probability per step, last step, play modes FWD / BWD / RND / PP / PP2, shuffle, transpose, RND PATT with limits, 8 scales and an arpeggiator. 16 presets with patterns, MIDI clock in. Unofficial.",
+  "description": "A monophonic bassline after the Erica Synths Bassline DB-01, with only its own controls: one VCO (triangle, saw, square), sub, noise, BBD-style detune, overdrive, FM from the LFO, a saturating 12 dB Polivoks-style LP/BP filter with decay and depth, a sustain-release VCA (fully up: a drone), an LFO with 10 shapes. The DB-01 sequencer: 64 steps with gate, accent, slide, mod track, pitch envelope and probability per step, play modes, shuffle, random patterns with limits, scales and an arpeggiator. 16 presets, MIDI clock in. Unofficial.",
   "tags": [
     "synth"
   ],
