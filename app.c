@@ -1958,7 +1958,11 @@ static int batt_level(void)
     if (ui.batt_test)
         return ui.batt_test - 2;         /* (Tests: 1 = nicht gelesen, 2..6 = 0..4) */
 #endif
+#ifdef __EMSCRIPTEN__
+    return 3;                            /* (die Browser-Version hat keinen Akku: sie zeigt ihn voll, damit man ihn sieht) */
+#else
     return plat_battery();
+#endif
 }
 
 static int batt_raw_pct(void)            /* aus der Messung: 0..100, -1 keine Messung */
@@ -1968,7 +1972,11 @@ static int batt_raw_pct(void)            /* aus der Messung: 0..100, -1 keine Me
     if (ui.batt_tpct >= 0)
         return ui.batt_tpct;
 #endif
+#ifdef __EMSCRIPTEN__
+    raw = 620;                           /* (der Browser: voll, wie der Simulator) */
+#else
     raw = plat_battery_raw();
+#endif
     if (raw <= 0)
         return -1;
     raw = (raw - 515) * 100 / 100;       /* 515 leer .. 615 voll */
